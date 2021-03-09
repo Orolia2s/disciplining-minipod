@@ -2,12 +2,18 @@
 #include <stdio.h>
 #include <time.h>
 #include <errno.h>
+#include <string.h>
+#include <stddef.h>
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
+#include "config.h"
+#include "parameters.h"
+
+
 struct od {
     uint32_t data;
-    uint32_t params;
+    struct parameters params;
     clockid_t clockid;
 };
 
@@ -27,6 +33,7 @@ struct od *od_new(clockid_t clockid)
 struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
+	int ret;
 
 	if (path == NULL || *path == '\0' || err_msg == NULL) {
 		errno = EINVAL;
@@ -37,8 +44,13 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	if (od == NULL)
 		return NULL;
 
+	ret = fill_parameters(&od->params, path, err_msg);
+
+	print_parameters(&od->params);
+
 	od->clockid = CLOCK_REALTIME;
-    printf("Od_new_from_config called \n");
+    printf("ret is %d, Path is %s\n", ret, path);
+	printf("Od_new_from_config called \n");
 
 	return od;
 }
