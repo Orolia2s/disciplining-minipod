@@ -18,6 +18,28 @@ static double sum(double values[], int length) {
 	return sum;
 }
 
+/*
+ * Return the index where to insert item x in list a, assuming a is sorted.
+ * The return value i is such that all e in a[:i] have e <= x, and all e in
+ * a[i:] have e > x.
+ */
+static int bisect_right(double values[], int length, double x) {
+	int low = 0;
+	int step = 0;
+	int hi = length;
+	if (hi < 0)
+		return -EINVAL;
+
+	while(low < hi) {
+		step = (int) (low + hi) / 2;
+		if (x < values[step])
+			hi = step;
+		else
+			low = step + 1;
+	}
+	return low;
+}
+
 int simple_linear_reg(double x[], double y[], int length, struct linear_func_param * func_params) {
 	double mean_x;
 	double mean_y;
