@@ -69,3 +69,52 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 
 	return 0;
 }
+
+/* piece-wise linear interpolation/extrapolation for given x and y array in ascending order
+ * x_interp: allows to choose between x interpolation or y one.
+ */
+int lin_interp(double x[], double y[], int length, bool x_interp, double interp_value, double *interp_result) {
+	double slopes[length - 1];
+	int index;
+
+	if (length < 0)
+		return -EINVAL;
+	
+	for (int i = 0; i < length -1; i++) {
+		if (x[i+1] - x[i] == 0.0)
+			return -EINVAL;
+		else
+			slopes[i] = (y[i+1] - y[i]) / (x[i+1] - x[i]);
+	}
+
+	if (x_interp) {
+		/* X interpolation */
+		if (interp_value >= x[length - 1])
+			index = length - 2;
+		else {
+			index = bisect_right(x, length, interp_value) - 1;
+			if (index <= 0)
+				index = 0;
+		}
+		
+		*interp_result = y[index] + slopes[index] * (interp_value - x[index]);
+	} else {
+		/* Y interpolation */
+		if (interp_value >= y[length - 1])
+			index = length - 2;
+		else {
+			index = bisect_right(y, length, interp_value) - 1;
+			if (index <= 0)
+				index = 0;
+		}
+		
+
+		printf("index is %d, x1 %f, interp_val %f, y1 %f, slopes %f\n", index, x[index], interp_value, y[index], slopes[index]);
+		if (slopes[index] == 0.0)
+			*interp_result = x[index];
+		else
+			*interp_result = x[index] + (interp_value - y[index]) / slopes[index];
+	}
+
+	return 0;
+}
