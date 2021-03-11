@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define X_INTERPOLATION true
+#define Y_INTERPOLATION false
 /* parameters of a linear function such as y = a*x + b */
 struct linear_func_param {
 	double a;
