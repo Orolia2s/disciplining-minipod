@@ -14,11 +14,56 @@
 #define ARRAY_SIZE(_A) (sizeof(_A) / sizeof((_A)[0]))
 #endif
 
+#define ARRAY_SIZE_MAX 100
 
 static bool debug = false;
 
 typedef int (*parser_fn)(const char *value, struct parameters *p,
 		const struct config_key *key);
+
+
+static int double_array_parser(const char* value, struct parameters *p, const struct config_key *key) {
+	double **location;
+	char *endptr;
+	char *ptr;
+	char delim = ',';
+	double buffer[ARRAY_SIZE_MAX];
+	int parsed = 0;
+	double value_double;
+
+	errno = 0;
+
+	ptr = strtok((char *) value, &delim);
+	while (ptr != NULL)
+	{
+		if (parsed >= ARRAY_SIZE_MAX) {
+			return -ERANGE;
+		}
+
+		value_double = strtold(ptr, &endptr);
+		if (value_double == HUGE_VAL ||
+			(value_double == 0 && errno == ERANGE))
+			return -ERANGE;
+		buffer[parsed] = value_double;
+		parsed ++;
+		ptr = strtok(NULL, &delim);
+	}
+
+	double *values = malloc(parsed * sizeof(double));
+	if (values == NULL) {
+		return -ENOMEM;
+	}
+	for (int i = 0; i < parsed; i++) {
+		values[i] = buffer[i];
+	}
+	location = (typeof(location))((uintptr_t)p + key->offset);
+	*location = values;
+
+	if (debug)
+		fprintf(stderr, "%s is %p\n", key->name, values);
+
+	return 0;
+}
 
 static int double_parser(const char *value, struct parameters *p,
 		const struct config_key *key)
@@ -103,6 +148,7 @@ static const parser_fn parsers[] = {
 		[VALUE_TYPE_BOOL] = bool_parser,
 		[VALUE_TYPE_INT] = int_parser,
 		[VALUE_TYPE_CHAR] = char_parser,
+		[VALUE_TYPE_DOUBLE_ARRAY] = double_array_parser,
 };
 
 /* override the parameters which are specified in the configuration file */
