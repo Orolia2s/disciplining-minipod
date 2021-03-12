@@ -24,6 +24,14 @@
 
 #define TOLERANCE_CHECK_MRO 200
 
+/* Constants for get_reactivity function */
+/* min should not go below a few settling times */
+#define REACTIVITY_MIN 20
+/* max should ideally correspond to the timescale of optimal oscillator stability.*/
+#define REACTIVITY_MAX 80
+/* # Increase for flatter top -> extend zone of maximal stability. Decrease for more peaked profile (more reactive) */
+#define REACTIVITY_POWER 4
+
 struct od {
     struct algorithm_state state;
     struct parameters params;
@@ -140,6 +148,40 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		output->action = CALIBRATE;
 		return false;
 	}
+}
+
+static double get_reactivity(double phase_ns, int sigma) {
+	double r = REACTIVITY_MAX * exp(-pow(phase_ns/sigma, REACTIVITY_POWER));
+	return r > REACTIVITY_MIN ? r : REACTIVITY_MIN;
+}
+
+static double filter_phase(struct kalman_parameters *kalman, double phase, int interval, double estimated_drift) {
+	/* Init Kalman phase */
+	if (!kalman->Kphase_set) {
+		kalman->Kphase = phase;
+		kalman->Kphase_set = true;
+	}
+
+	/* Predict */
+	kalman->Kphase += interval * estimated_drift;
+	kalman->Ksigma += kalman->q;
+	printf("expected drift = %f\n", interval * estimated_drift);
+	printf("prior phase = %f\n", kalman->Kphase);
+
+	/* Square computing to do it once */
+	double square_Ksigma = pow(kalman->Ksigma, 2);
+	double square_r = pow(kalman->r, 2);
+
+	/* Update */
+	double gain = square_Ksigma / (square_Ksigma + square_r);
+	printf("Kgain = %f\n", gain);
+	double innovation = (phase - kalman->Kphase);
+	kalman->Kphase = kalman->Kphase + gain * innovation;
+	kalman->Ksigma = sqrt((square_r * square_Ksigma)
+		/ (square_r + square_Ksigma)
+	);
+
+	return kalman->Kphase;
 }
 
 struct od *od_new(clockid_t clockid)
