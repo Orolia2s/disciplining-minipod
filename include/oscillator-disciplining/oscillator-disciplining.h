@@ -1,8 +1,7 @@
 /**
  * @mainpage liboscillator-disciplining
  *
- * C library for disciplining an oscillator.
- * Uses C code generated from matlab internally.
+ * C library for disciplining an oscillator using miniCod algorithm.
  *
  * @see oscillator-disciplining.h for API documentation.
  */
@@ -12,36 +11,10 @@
  *
  * liboscillator-disciplining is a small library responsible of abstracting
  * disciplining algorithms used for an oscillator for which we want to control
- * the DAC.
+ * the frequency.
  *
- * Here is some pseudo-code of how to use the library
- * @code{.c}
-	struct od_input input;
-	struct od_output output;
-	struct __attribute__((cleanup(od_destroy)))od *od = NULL;
-	char err_msg[OD_ERR_MSG_LEN];
-
-	od = od_new_from_config(config_path, err_msg);
-	if (od == NULL)
-		error(EXIT_FAILURE, errno, "od_new");
-
-	while (condition) {
-		input = (struct od_input) {
-			.phase_error = (struct timespec) {
-				.tv_sec = phase_error / NS_IN_SECOND,
-				.tv_nsec = phase_error % NS_IN_SECOND,
-			},
-			.valid = pps_valid,
-		};
-
-		ret = od_process(od, &input, &output);
-		if (ret < 0)
-			error(EXIT_FAILURE, -ret, "od_process");
-
-		// control the oscillator with output.setpoint
-	}
- * @endcode
  */
+
 #ifndef INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_
 #define INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_
 #include <time.h>
