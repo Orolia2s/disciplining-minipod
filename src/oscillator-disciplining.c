@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stddef.h>
+#include <math.h>
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
@@ -20,6 +21,8 @@
 #define COARSE_RANGE_MAX 4194303
 #define FINE_RANGE_MIN 1600
 #define FINE_RANGE_MAX 3200
+
+#define TOLERANCE_CHECK_MRO 200
 
 struct od {
     struct algorithm_state state;
@@ -52,9 +55,10 @@ static int init_algorithm_state(struct od * od) {
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = params->ref_fluctuations_ns;
-	state->kalman.Kphase = 0;
-	state->kalman.q = 1;
-	state->kalman.r = 5;
+	state->kalman.Kphase = 0.0;
+	state->kalman.q = 1.0;
+	state->kalman.r = 5.0;
+	state->kalman.Kphase_set = false;
 
 	/*
 	 * Init ctrl_points, which have the same size as
@@ -86,7 +90,7 @@ static int init_algorithm_state(struct od * od) {
 		ctrl_points_double,
 		params->ctrl_drift_coeffs,
 		params->ctrl_nodes_length,
-		X_INTERPOLATION,
+		Y_INTERPOLATION,
 		0,
 		&interpolation_value
 	);
@@ -99,6 +103,45 @@ static int init_algorithm_state(struct od * od) {
 	return 0;
 }
 
+/*
+ * Check if fine control setpoint is within available range +/- a tolerance.
+ * If not the coarse control value is changed in order to re-center the fine control.
+ * init_control_mRO must be called after a coarse change.
+ */
+static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
+	if (od->state.calib
+		&& (od->state.estimated_equilibrium >= (uint32_t) od->state.ctrl_range_fine[0]-TOLERANCE_CHECK_MRO
+		|| od->state.estimated_equilibrium <= (uint32_t) od->state.ctrl_range_fine[1]-TOLERANCE_CHECK_MRO)
+	) {
+		/* estimated equilibrium is in tolerance range and no calibration is running */
+		return true;
+	} else if (od->state.calib) {
+		/* Adjusting coarse alignment base on calibration */
+		int32_t delta_mid_fine = (int32_t) od->state.estimated_equilibrium - od->state.fine_mid;
+		int32_t delta_coarse = (int32_t) round(
+			delta_mid_fine
+			* od->state.mRO_coarse_step_sensitivity
+			/ od->state.mRO_coarse_step_sensitivity
+		);
+		if (abs(delta_coarse) > 30) {
+			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
+			if (delta_coarse > 0) {
+				delta_coarse = 30;
+			} else {
+				delta_coarse = -30;
+			}
+		}
+		output->setpoint = input->coarse_setpoint + delta_coarse;
+		output->action = ADJUST_COARSE;
+		output->value_phase_ctrl = 0;
+		return false;
+	} else {
+		/* mRO needs to be calibrated */
+		output->action = CALIBRATE;
+		return false;
+	}
+}
+
 struct od *od_new(clockid_t clockid)
 {
 	struct od *od;
@@ -108,7 +151,7 @@ struct od *od_new(clockid_t clockid)
 		return NULL;
 	od->clockid = clockid;
 
-    printf("Od_new called \n");
+	printf("Od_new called \n");
 	return od;
 }
 
@@ -162,8 +205,299 @@ uint32_t od_get_dac_max(const struct od *od)
 int od_process(struct od *od, const struct od_input *input,
 		struct od_output *output)
 {
+	int ret;
+	if (input->valid && input->lock)
+	{
+		/* Invalid control value, need to check mRO control values */
+		if (od->state.invalid_ctrl) // Add od->params.ctrl_drift_coeffs == NULL or included in invalid_ctrl ?
+		{
+			if(!control_check_mRO(od, input, output))
+			{
+				/* Control check has not been passed.
+				* Either a Coarse alignement or a calibration process
+				* has been decided and prepared in output
+				*/
+				return 0;
+			}
+		}
+
+		if (od->state.status == INIT)
+		{
+			printf("INIT: Applying estimated equilibrium setpoint %u", od->state.estimated_equilibrium);
+			output->action = ADJUST_FINE;
+			output->setpoint = od->state.estimated_equilibrium;
+			od->state.status = PHASE_ADJUSTMENT;
+			return 0;
+		}
+		else
+		{
+			if (labs(input->phase_error.tv_nsec) < od->params.phase_jump_threshold_ns)
+			{
+				/* Call Main loop */
+				double phase = input->phase_error.tv_nsec;
+				double filtered_phase = filter_phase(
+					&(od->state.kalman),
+					phase,
+					od->params.ref_fluctuations_ns,
+					od->state.estimated_drift
+				);
+				double innovation = phase - filtered_phase;
+
+				double x;
+				if (fabs(phase) <= od->params.ref_fluctuations_ns
+					&& fabs(innovation) <= od->params.ref_fluctuations_ns)
+				{
+					x = filtered_phase;
+					printf("Using filtered phase\n");
+				}
+				else
+				{
+					x = phase;
+				}
+
+				double r = get_reactivity(fabs(x), od->params.ref_fluctuations_ns);
+				double  react_coeff = - x / r;
+
+				double ctrl_points_double[od->params.ctrl_nodes_length];
+				for (int i = 0; i < od->params.ctrl_nodes_length; i++)
+					ctrl_points_double[i] = (double) od->state.ctrl_points[i];
+				double interp_value;
+				ret = lin_interp(
+					ctrl_points_double,
+					od->params.ctrl_drift_coeffs,
+					od->params.ctrl_nodes_length,
+					Y_INTERPOLATION,
+					react_coeff,
+					&interp_value
+				);
+				if (ret < 0)
+				{
+					printf("Error occured in lin_interp: %d\n", ret);
+					return -1;
+				}
+
+				info("New fine ctrl value is %f\n", interp_value);
+				od->state.fine_ctrl_value = (uint16_t) round(interp_value);
+
+				if (od->state.fine_ctrl_value >= od->state.ctrl_range_fine[0]
+					&& od->state.fine_ctrl_value <= od->state.ctrl_range_fine[1])
+				{
+					od->state.estimated_drift = react_coeff;
+					output->action = ADJUST_FINE;
+					output->setpoint = od->state.fine_ctrl_value;
+				}
+				else
+				{
+					if (od->state.coarse_ctrl)
+					{
+						printf("Error: Not implemented\n");
+						return -1;
+					}
+					else
+					{
+						printf("Control value %u is out of range! Decrease reactivity or \
+							allow a lower phase jump threshold for quicker convergence. \
+							If this persists consider activating coarse control",
+							od->state.fine_ctrl_value
+						);
+					
+						double stop_value;
+						
+						if (od->state.fine_ctrl_value < od->state.ctrl_range_fine[0])
+							stop_value = od->state.ctrl_range_fine[0];
+						else
+							stop_value = od->state.ctrl_range_fine[1];
+						
+						double ctrl_points_double[od->params.ctrl_nodes_length];
+						for (int i = 0; i < od->params.ctrl_nodes_length; i++)
+							ctrl_points_double[i] = (double) od->state.ctrl_points[i];
+						ret = lin_interp(
+							ctrl_points_double,
+							od->params.ctrl_drift_coeffs,
+							od->params.ctrl_nodes_length,
+							X_INTERPOLATION,
+							stop_value,
+							&od->state.estimated_drift
+						);
+						
+						if (ret < 0)
+						{
+							printf("Error occured in lin_interp: %d\n", ret);
+							return -1;
+						}
+
+						output->action = ADJUST_FINE;
+						output->setpoint = stop_value;
+					}
+				}
+				return 0;
+			} else {
+				/* Phase jump needed */
+				output->action = PHASE_JUMP;
+				output->value_phase_ctrl = input->phase_error.tv_sec;
+				return 0;
+			}
+		}
+		
+
+	} else {
+		od->state.status = HOLDOVER;
+		output->action = ADJUST_FINE;
+		output->setpoint = od->state.estimated_equilibrium;
+		return 0;
+	}
 	printf("Od_process called \n");
 	return 0;
+}
+
+struct calibration_parameters * od_get_calibration_parameters(struct od *od)
+{
+	if (od == NULL)
+	{
+		err("Library context is null\n");
+		return NULL;
+	}
+
+	if (od->params.ctrl_nodes_length <= 0)
+	{
+		err("get_calibration_parameters: Length cannot be negative\n");
+		return NULL;
+	}
+	
+	struct calibration_parameters *calib_params = malloc(sizeof(struct calibration_parameters));
+	if (calib_params == NULL)
+	{
+		err("Could not allocate memory to create calibration parameters data\n");
+		return NULL;
+	}
+
+	calib_params->ctrl_points = malloc(od->params.ctrl_nodes_length * sizeof(uint16_t));
+	if (calib_params->ctrl_points == NULL) {
+		err("Could not allocate memory to create ctrl points in calibration parameters data\n");
+		free(calib_params);
+		calib_params = NULL;
+		return NULL;
+	}
+
+	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
+	{
+		calib_params->ctrl_points[i] = od->state.ctrl_points[i];
+	}
+
+	calib_params->length = od->params.ctrl_nodes_length;
+	calib_params->nb_calibration = od->params.nb_calibration;
+	calib_params->settling_time = od->params.settling_time;
+	od->state.calib = true;
+	return calib_params;
+}
+
+static void free_calibration(struct calibration_parameters *calib_params, struct calibration_results *calib_results)
+{
+	free(calib_params->ctrl_points);
+	calib_params->ctrl_points = NULL;
+	free(calib_params);
+	calib_params = NULL;
+	free(calib_results->calib_results);
+	calib_results->calib_results = NULL;
+	free(calib_results);
+	calib_results = NULL;
+	return;
+}
+
+void od_calibrate(struct od *od, struct calibration_parameters *calib_params, struct calibration_results *calib_results)
+{
+	int ret;
+	int length;
+
+	if (od == NULL || calib_params == NULL || calib_results == NULL)
+	{
+		err("od_calibration: at least one input parameter is null\n");
+		return;
+	}
+
+	if (calib_params->length != od->params.ctrl_nodes_length || calib_params->length != calib_results->length)
+	{
+		err("od_calibrate: length mismatch\n");
+		free_calibration(calib_params, calib_results);
+		return;
+	}
+	length = od->params.ctrl_nodes_length;
+
+	if (calib_params->nb_calibration != calib_results->nb_calibration)
+	{
+		err("od_calibrate: nb_calibration mismatch \n");
+		free_calibration(calib_params, calib_results);
+		return;
+	}
+
+	/* Create array representing all the integers between 0 and n_calibration */
+	double x[calib_params->nb_calibration];
+	for (int i = 0; i < calib_params->nb_calibration; i++)
+	{
+		x[i] = (double) i;
+	}
+
+	/* Update drift coefficients */
+	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
+	{
+		info("Computing drift coefficients for ctrl points %d\n", od->state.ctrl_points[i]);
+		info("phase drift array: ");
+		double v[calib_params->nb_calibration];
+		for(int j = 0; j < calib_params->nb_calibration; j++)
+		{
+			v[j] = (double) calib_results->calib_results[i][j].tv_nsec;
+			info("%ld ", calib_results->calib_results[i][j].tv_nsec);
+		}
+		info("\n");
+
+		struct linear_func_param func_params;
+		ret = simple_linear_reg(
+			x,
+			v,
+			calib_params->nb_calibration,
+			&func_params
+		);
+		if (ret < 0)
+		{
+			err("od_calibrate: error occured in simple_linear_reg, err %d\n", ret);
+			free_calibration(calib_params, calib_results);
+			return;
+		}
+		od->params.ctrl_drift_coeffs[i] = func_params.a;
+	}
+
+	double interp_value;
+	double ctrl_points_double[length];
+	for (int i = 0; i < length; i++)
+		ctrl_points_double[i] = (double) od->state.ctrl_points[i];
+	ret = lin_interp(
+		ctrl_points_double,
+		od->params.ctrl_drift_coeffs,
+		length,
+		Y_INTERPOLATION,
+		0,
+		&interp_value
+	);
+	if(ret < 0)
+	{
+		err("od_calibrate: error occured in lin_interp, err %d\n", ret);
+	}
+	od->state.estimated_equilibrium = (uint32_t) interp_value;
+	info("Estimated equilibrium at %d\n", od->state.estimated_equilibrium);
+
+	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0])
+	{
+		err("Control points cannot have the same value !\n");
+		free_calibration(calib_params, calib_results);
+		return;
+	}
+	od->state.mRO_fine_step_sensitivity = 1E-9
+		* ( od->params.ctrl_drift_coeffs[length - 1] - od->params.ctrl_drift_coeffs[0])
+		/ ( od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] );
+	info("Estimated fine gain / step = %f", od->state.mRO_fine_step_sensitivity);
+
+	free_calibration(calib_params, calib_results);
+	return;
 }
 
 void od_destroy(struct od **od)

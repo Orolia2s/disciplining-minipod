@@ -13,10 +13,11 @@ struct parameters {
 };
 
 struct kalman_parameters {
-	int Ksigma;
-	int Kphase;
-	int q;
-	int r;
+	double Ksigma;
+	double Kphase;
+	float q;
+	float r;
+	bool Kphase_set;
 };
 
 enum State {
@@ -40,7 +41,7 @@ struct algorithm_state {
 	uint32_t coarse_ctrl_value;
 	uint16_t fine_ctrl_value;
 	uint32_t estimated_equilibrium;
-	uint32_t estimated_drift;
+	double estimated_drift;
 	struct kalman_parameters kalman;
 };
 

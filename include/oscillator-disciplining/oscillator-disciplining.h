@@ -37,10 +37,30 @@ struct od_input {
 	struct timespec phase_error;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
+	/** is mRO locked */
+	bool lock;
 	/** temperature, only used for logging. */
 	uint16_t temperature;
 	/** Quantization error for the next PPS (unit is ps) */
 	int32_t qErr;
+	/** Fine adjustement setpoint */
+	uint32_t fine_setpoint;
+	/** Coarse adjustement setpoint */
+	uint32_t coarse_setpoint;
+};
+
+/**
+ * @enum output_action
+ * @brief Enumeration of the possible action that must be done to control
+ * the oscillator
+ */
+enum output_action {
+	NO_OP,
+	PHASE_JUMP,
+	ADJUST_FINE,
+	ADJUST_COARSE,
+	CALIBRATE,
+	NUM_ACTIONS,
 };
 
 /**
@@ -48,11 +68,16 @@ struct od_input {
  * @brief Structure which will be fed with the algorithm's outputs after
  * returning from od_process.
  */
+
 struct od_output {
-	/** control value in [31500 1016052] */
+	/** frequence adjustment value, ranges depend wether concerning
+	 * fine or coarse alignement:
+	 * coarse: [0, 4194303]
+	 * fine: [1600, 3200]
+	 */
 	uint32_t setpoint;
-	/** Indicate if phase jump should be done */
-	bool activate_phase_ctrl;
+	/** Indicate action that should be done */
+	enum output_action action;
 	/** value of the phase jump */
 	int32_t value_phase_ctrl;
 };
