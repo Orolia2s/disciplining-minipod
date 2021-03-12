@@ -3,14 +3,7 @@
 
 #include <stdio.h>
 
-struct parameters {
-	int ref_fluctuations_ns;
-	int phase_jump_threshold_ns;
-	int phase_resolution_ns;
-	int ctrl_nodes_length;
-	double *ctrl_load_nodes;
-	double *ctrl_drift_coeffs;
-};
+#include "algorithm_structs.h"
 
 enum value_type {
 	VALUE_TYPE_DOUBLE,

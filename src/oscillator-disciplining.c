@@ -10,6 +10,7 @@
 #include "config.h"
 #include "parameters.h"
 #include "utils.h"
+#include "algorithm_structs.h"
 
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
@@ -19,38 +20,6 @@
 #define COARSE_RANGE_MAX 4194303
 #define FINE_RANGE_MIN 1600
 #define FINE_RANGE_MAX 3200
-
-enum State {
-	INIT,
-	PHASE_ADJUSTMENT,
-	HOLDOVER,
-};
-
-struct kalman_parameters {
-	int Ksigma;
-	int Kphase;
-	int q;
-	int r;
-};
-
-struct algorithm_state {
-	enum State status;
-	double mRO_fine_step_sensitivity;
-	double mRO_coarse_step_sensitivity;
-	bool coarse_ctrl;
-	bool invalid_ctrl;
-	int settling_time;
-	bool calib;
-	uint32_t ctrl_range_coarse[2];
-	uint16_t ctrl_range_fine[2];
-	uint16_t *ctrl_points;
-	uint16_t fine_mid;
-	uint32_t coarse_ctrl_value;
-	uint16_t fine_ctrl_value;
-	uint32_t estimated_equilibrium;
-	uint32_t estimated_drift;
-	struct kalman_parameters kalman;
-};
 
 struct od {
     struct algorithm_state state;
