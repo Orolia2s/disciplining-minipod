@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "algorithm_structs.h"
+#include "log.h"
 
 enum value_type {
 	VALUE_TYPE_DOUBLE,
@@ -34,18 +35,20 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(ctrl_nodes_length, INT),
 	CONFIG_ENTRY(ctrl_load_nodes, DOUBLE_ARRAY),
 	CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY),
+	CONFIG_ENTRY(debug, BOOL),
 };
 
 static inline void print_parameters(struct parameters *params) {
-	printf("ref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
-	printf("phase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
-	printf("phase_resolution_ns: %d\n", params->phase_resolution_ns);
-	printf("ctrl_nodes_length: %d\n", params->ctrl_nodes_length);
+	info("debug %s\n", params->debug ? "true" : "false");
+	info("ref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
+	info("phase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
+	info("phase_resolution_ns: %d\n", params->phase_resolution_ns);
+	info("ctrl_nodes_length: %d\n", params->ctrl_nodes_length);
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		printf("ctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
+		info("ctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
 	}
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		printf("ctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
+		info("ctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
 	}
 }
 

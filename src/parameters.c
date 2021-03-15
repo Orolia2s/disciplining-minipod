@@ -9,14 +9,13 @@
 
 #include "parameters.h"
 #include "config.h"
+#include "log.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(_A) (sizeof(_A) / sizeof((_A)[0]))
 #endif
 
 #define ARRAY_SIZE_MAX 100
-
-static bool debug = false;
 
 typedef int (*parser_fn)(const char *value, struct parameters *p,
 		const struct config_key *key);
@@ -59,8 +58,7 @@ static int double_array_parser(const char* value, struct parameters *p, const st
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = values;
 
-	if (debug)
-		fprintf(stderr, "%s is %p\n", key->name, values);
+	debug("double_array_index %s is %p\n", key->name, values);
 
 	return 0;
 }
@@ -80,8 +78,7 @@ static int double_parser(const char *value, struct parameters *p,
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_double;
 
-	if (debug)
-		fprintf(stderr, "%s is %ff\n", key->name, value_double);
+	debug("double_parser %s is %ff\n", key->name, value_double);
 
 	return 0;
 }
@@ -101,9 +98,8 @@ static int bool_parser(const char *value, struct parameters *p,
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_bool;
 
-	if (debug)
-		fprintf(stderr, "%s is %s\n", key->name,
-				value_bool ? "true" : "false");
+	debug("bool parser %s is %s\n", key->name,
+		value_bool ? "true" : "false");
 
 	return 0;
 }
@@ -123,8 +119,7 @@ static int int_parser(const char *value, struct parameters *p,
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_int;
 
-	if (debug)
-		fprintf(stderr, "%s is %ld\n", key->name, value_int);
+	debug("int parser %s is %ld\n", key->name, value_int);
 
 	return 0;
 }
@@ -137,8 +132,7 @@ static int char_parser(const char *value, struct parameters *p,
 	location = (typeof(location)) ((uintptr_t)p + key->offset);
 	*location = value_char;
 
-	if (debug)
-		fprintf(stderr, "%s is %c\n", key->name, value_char);
+	debug("char parser %s is %c\n", key->name, value_char);
 
 	return 0;
 }
@@ -165,7 +159,8 @@ int fill_parameters(struct parameters *p, const char *path,
 	/* must be first */
 	ret = config_init(&config, path);
 	if (ret < 0) {
-		snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
+		err("config_init failed");
+		err("err %s", err_msg);
 		return ret;
 	}
 
@@ -177,8 +172,8 @@ int fill_parameters(struct parameters *p, const char *path,
 			continue;
 		ret = parser(value, p, key);
 		if (ret != 0) {
-			snprintf(err_msg, OD_ERR_MSG_LEN, "parsing %s failed",
-					key->name);
+			err("parsing %s failed", key->name);
+			err("err %s", err_msg);
 			return ret;
 		}
 	}

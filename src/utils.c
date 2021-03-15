@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "log.h"
 
 #include <errno.h>
 #include <math.h>
@@ -27,8 +28,10 @@ static int bisect_right(double values[], int length, double x) {
 	int low = 0;
 	int step = 0;
 	int hi = length;
-	if (hi < 0)
+	if (hi < 0) {
+		err("bisect_right: length cannot be negative!\n");
 		return -EINVAL;
+	}
 
 	while(low < hi) {
 		step = (int) (low + hi) / 2;
@@ -45,6 +48,7 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 	double mean_y;
 	
 	if (length <= 0) {
+		err("simple_linear_red: length cannot be negative\n");
 		return -EINVAL;
 	}
 
@@ -57,11 +61,14 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 		ss_x[i] = x[i] * (y[i] - mean_y);
 		ss_y[i] = x[i] * (x[i] - mean_x);
 
-		if (ss_x[i] == HUGE_VAL || ss_y[i] == HUGE_VAL)
+		if (ss_x[i] == HUGE_VAL || ss_y[i] == HUGE_VAL) {
+			err("HUGE_VAL detected ! ss_x[%d] is %f and ss_y[%d] is %f\n", i, ss_x[i], i, ss_y[i]);
 			return -ERANGE;
+		}
 	}
 	double sum_ss_y = sum(ss_y, length);
 	if (sum_ss_y == 0.0) {
+		err("sum_ss_y is equal to 0\n");
 		return -EINVAL;
 	}
 	func_params->a = sum(ss_x, length) / sum_ss_y;
@@ -76,13 +83,16 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 int lin_interp(double x[], double y[], int length, bool x_interp, double interp_value, double *interp_result) {
 	double slopes[length - 1];
 	int index;
-
-	if (length < 0)
+	if (length < 0) {
+		err("lin_interp: length cannot be negative (value is %d)\n", length);
 		return -EINVAL;
-	
+	}
+
 	for (int i = 0; i < length -1; i++) {
-		if (x[i+1] - x[i] == 0.0)
+		if (x[i+1] - x[i] == 0.0) {
+			err("difference between x values at %d and %d is null\n", i, i+1);
 			return -EINVAL;
+		}
 		else
 			slopes[i] = (y[i+1] - y[i]) / (x[i+1] - x[i]);
 	}
@@ -109,7 +119,7 @@ int lin_interp(double x[], double y[], int length, bool x_interp, double interp_
 		}
 		
 
-		printf("index is %d, x1 %f, interp_val %f, y1 %f, slopes %f\n", index, x[index], interp_value, y[index], slopes[index]);
+		debug("index is %d, x1 %f, interp_val %f, y1 %f, slopes %f\n", index, x[index], interp_value, y[index], slopes[index]);
 		if (slopes[index] == 0.0)
 			*interp_result = x[index];
 		else

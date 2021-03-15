@@ -10,6 +10,7 @@ struct parameters {
 	int ctrl_nodes_length;
 	double *ctrl_load_nodes;
 	double *ctrl_drift_coeffs;
+	bool debug;
 };
 
 struct kalman_parameters {

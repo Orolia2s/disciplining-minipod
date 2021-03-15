@@ -12,6 +12,7 @@
 #include "parameters.h"
 #include "utils.h"
 #include "algorithm_structs.h"
+#include "log.h"
 
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
@@ -103,7 +104,7 @@ static int init_algorithm_state(struct od * od) {
 		&interpolation_value
 	);
 	if (ret < 0) {
-		printf("Error occured during lin_terp, err %d", -ret);
+		err("Error occured during lin_interp, err %d\n", -ret);
 		return ret;
 	}
 	state->estimated_equilibrium = (uint32_t) interpolation_value;
@@ -165,8 +166,8 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 	/* Predict */
 	kalman->Kphase += interval * estimated_drift;
 	kalman->Ksigma += kalman->q;
-	printf("expected drift = %f\n", interval * estimated_drift);
-	printf("prior phase = %f\n", kalman->Kphase);
+	debug("expected drift = %f\n", interval * estimated_drift);
+	debug("prior phase = %f\n", kalman->Kphase);
 
 	/* Square computing to do it once */
 	double square_Ksigma = pow(kalman->Ksigma, 2);
@@ -174,7 +175,7 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 
 	/* Update */
 	double gain = square_Ksigma / (square_Ksigma + square_r);
-	printf("Kgain = %f\n", gain);
+	debug("Kgain = %f\n", gain);
 	double innovation = (phase - kalman->Kphase);
 	kalman->Kphase = kalman->Kphase + gain * innovation;
 	kalman->Ksigma = sqrt((square_r * square_Ksigma)
@@ -193,7 +194,7 @@ struct od *od_new(clockid_t clockid)
 		return NULL;
 	od->clockid = clockid;
 
-	printf("Od_new called \n");
+	debug("Od_new called \n");
 	return od;
 }
 
@@ -213,15 +214,17 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 
 	ret = fill_parameters(&od->params, path, err_msg);
 
+	log_enable_debug(od->params.debug);
+
 	print_parameters(&od->params);
 
 	od->clockid = CLOCK_REALTIME;
 
 	ret = init_algorithm_state(od);
 	if (ret < 0) {
-		printf("Error occured during init_algorithm_state, err %d", ret);
+		err("Error occured during init_algorithm_state, err %d\n", ret);
 	}
-	printf("Od_new_from_config called \n");
+	debug("Od_new_from_config called\n");
 
 	return od;
 }
@@ -231,7 +234,7 @@ uint32_t od_get_dac_min(const struct od *od)
 	if (od == NULL)
 		return  UINT32_MAX;
 
-	printf("Od_get_dac_min called \n");
+	debug("Od_get_dac_min called \n");
 	return 0;
 }
 
@@ -240,7 +243,7 @@ uint32_t od_get_dac_max(const struct od *od)
 	if (od == NULL)
 		return 0;
 
-	printf("Od_get_dac_max called \n");
+	debug("Od_get_dac_max called \n");
 	return 0;
 }
 
@@ -265,7 +268,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 		if (od->state.status == INIT)
 		{
-			printf("INIT: Applying estimated equilibrium setpoint %u", od->state.estimated_equilibrium);
+			debug("INIT: Applying estimated equilibrium setpoint %u", od->state.estimated_equilibrium);
 			output->action = ADJUST_FINE;
 			output->setpoint = od->state.estimated_equilibrium;
 			od->state.status = PHASE_ADJUSTMENT;
@@ -290,7 +293,7 @@ int od_process(struct od *od, const struct od_input *input,
 					&& fabs(innovation) <= od->params.ref_fluctuations_ns)
 				{
 					x = filtered_phase;
-					printf("Using filtered phase\n");
+					debug("Using filtered phase\n");
 				}
 				else
 				{
@@ -314,7 +317,7 @@ int od_process(struct od *od, const struct od_input *input,
 				);
 				if (ret < 0)
 				{
-					printf("Error occured in lin_interp: %d\n", ret);
+					err("Error occured in lin_interp: %d\n", ret);
 					return -1;
 				}
 
@@ -332,12 +335,12 @@ int od_process(struct od *od, const struct od_input *input,
 				{
 					if (od->state.coarse_ctrl)
 					{
-						printf("Error: Not implemented\n");
+						err("Error: Not implemented\n");
 						return -1;
 					}
 					else
 					{
-						printf("Control value %u is out of range! Decrease reactivity or \
+						info("Control value %u is out of range! Decrease reactivity or \
 							allow a lower phase jump threshold for quicker convergence. \
 							If this persists consider activating coarse control",
 							od->state.fine_ctrl_value
@@ -364,7 +367,7 @@ int od_process(struct od *od, const struct od_input *input,
 						
 						if (ret < 0)
 						{
-							printf("Error occured in lin_interp: %d\n", ret);
+							err("Error occured in lin_interp: %d\n", ret);
 							return -1;
 						}
 
@@ -388,7 +391,7 @@ int od_process(struct od *od, const struct od_input *input,
 		output->setpoint = od->state.estimated_equilibrium;
 		return 0;
 	}
-	printf("Od_process called \n");
+	debug("Od_process called \n");
 	return 0;
 }
 
@@ -552,5 +555,5 @@ void od_destroy(struct od **od)
 	(*od)->params.ctrl_drift_coeffs = NULL;
 	free(*od);
 	*od = NULL;
-	printf("Od_destroy called \n");
+	debug("Od_destroy called \n");
 }
