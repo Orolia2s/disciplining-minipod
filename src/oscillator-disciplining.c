@@ -214,8 +214,12 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	od = calloc(1, sizeof(*od));
 	if (od == NULL)
 		return NULL;
-
+	
 	ret = fill_parameters(&od->params, path, err_msg);
+	if (ret != 0) {
+		err("Error parsing config file !\n");
+		return NULL;
+	}
 
 	log_enable_debug(od->params.debug);
 

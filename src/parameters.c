@@ -168,8 +168,10 @@ int fill_parameters(struct parameters *p, const char *path,
 		key = config_keys + i;
 		parser = parsers[key->type];
 		value = config_get(&config, key->name);
-		if (value == NULL)
-			continue;
+		if (value == NULL) {
+			err("Key %s has not been found !\n", key->name);
+			return -EINVAL;
+		}
 		ret = parser(value, p, key);
 		if (ret != 0) {
 			err("parsing %s failed", key->name);
