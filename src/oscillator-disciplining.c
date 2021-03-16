@@ -254,6 +254,17 @@ int od_process(struct od *od, const struct od_input *input,
 		struct od_output *output)
 {
 	int ret;
+	info("OD_process inside loop !\n");
+	if (od == NULL || input == NULL || output == NULL)
+	{
+		err("At least one input variable is NULL\n");
+		return -EINVAL;
+	}
+	log_enable_debug(od->params.debug);
+	info("State is %d\n", od->state.status);
+	struct algorithm_state *state = &(od->state);
+	struct parameters *params = &(od->params);
+	info("valid is %d and lock is %d\n", input->valid, input->lock);
 	if (input->valid && input->lock)
 	{
 		/* Invalid control value, need to check mRO control values */
