@@ -33,6 +33,9 @@
 /* # Increase for flatter top -> extend zone of maximal stability. Decrease for more peaked profile (more reactive) */
 #define REACTIVITY_POWER 4
 
+/* Number of calibration points needed for each control points */
+#define NB_CALIBRATION 30
+
 struct od {
     struct algorithm_state state;
     struct parameters params;
@@ -379,7 +382,7 @@ int od_process(struct od *od, const struct od_input *input,
 			} else {
 				/* Phase jump needed */
 				output->action = PHASE_JUMP;
-				output->value_phase_ctrl = input->phase_error.tv_sec;
+				output->value_phase_ctrl = input->phase_error.tv_nsec;
 				return 0;
 			}
 		}
@@ -442,8 +445,8 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 	calib_params->ctrl_points = NULL;
 	free(calib_params);
 	calib_params = NULL;
-	free(calib_results->calib_results);
-	calib_results->calib_results = NULL;
+	free(calib_results->measures);
+	calib_results->measures = NULL;
 	free(calib_results);
 	calib_results = NULL;
 	return;
@@ -483,19 +486,20 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	/* Update drift coefficients */
+	info("Pointer of calib _results is %p\n", calib_results->measures);
 	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
 	{
 		info("Computing drift coefficients for ctrl points %d\n", od->state.ctrl_points[i]);
-		info("phase drift array: ");
 		double v[calib_params->nb_calibration];
 		for(int j = 0; j < calib_params->nb_calibration; j++)
 		{
-			v[j] = (double) calib_results->calib_results[i][j].tv_nsec;
-			info("%ld ", calib_results->calib_results[i][j].tv_nsec);
+
+			struct timespec * current_measure = calib_results->measures + i * calib_params->nb_calibration + j;
+			v[j] = (double) current_measure->tv_nsec;
 		}
-		info("\n");
 
 		struct linear_func_param func_params;
+
 		ret = simple_linear_reg(
 			x,
 			v,
@@ -509,6 +513,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			return;
 		}
 		od->params.ctrl_drift_coeffs[i] = func_params.a;
+		info("New drift coeffs %d is %f\n", i, od->params.ctrl_drift_coeffs[i]);
 	}
 
 	double interp_value;
@@ -530,7 +535,10 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
 	info("Estimated equilibrium at %d\n", od->state.estimated_equilibrium);
 
-	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0])
+	for (int i = 0; i < length; i++) {
+		info("ctrl_points[%d] = %d\n", i, od->state.ctrl_points[i]);
+	}
+	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{
 		err("Control points cannot have the same value !\n");
 		free_calibration(calib_params, calib_results);
@@ -539,7 +547,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	od->state.mRO_fine_step_sensitivity = 1E-9
 		* ( od->params.ctrl_drift_coeffs[length - 1] - od->params.ctrl_drift_coeffs[0])
 		/ ( od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] );
-	info("Estimated fine gain / step = %f", od->state.mRO_fine_step_sensitivity);
+	info("Estimated fine gain / step = %.21f\n", od->state.mRO_fine_step_sensitivity);
 
 	free_calibration(calib_params, calib_results);
 	return;
