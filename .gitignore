@@ -1,1 +1,4 @@
 build/
+*.o
+test-minipod-lib
+test-utils

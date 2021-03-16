@@ -1,6 +1,6 @@
 C= gcc
 CPPFLAGS= -Wall -Werror -g -O0 -std=gnu99 -I../src
-LDLIBS= -lm
+LDLIBS= -lm -loscillator-disciplining
 
 # First test is just to test utils functions
 EXE= test-utils
@@ -8,8 +8,15 @@ OBJS= test-utils.o utils.o log.o
 
 # Second test is used to test the library interface
 EXE2 = test-minipod-lib
+OBJS2 = test-minipod-lib.o
+
+test-minipod: test-minipod-lib
+	LD_LIBRARY_PATH=/usr/local/lib ./test-minipod-lib
 
 $(EXE): $(OBJS)
+	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(EXE2): $(OBJS2)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 test-utils.o : test-utils.c
@@ -24,3 +31,4 @@ log.o : ../src/log.c
 clean:
 	rm -f *.o
 	rm -f test-utils
+	rm -f test-minipod-lib
