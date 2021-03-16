@@ -2,19 +2,25 @@ C= gcc
 CPPFLAGS= -Wall -Werror -g -O0 -std=gnu99 -I../src
 LDLIBS= -lm
 
-EXE= test
-OBJS= main.o utils.o
+# First test is just to test utils functions
+EXE= test-utils
+OBJS= test-utils.o utils.o log.o
+
+# Second test is used to test the library interface
+EXE2 = test-minipod-lib
 
 $(EXE): $(OBJS)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-main.o : main.c
+test-utils.o : test-utils.c
 	$(C) $(CPPFLAGS) -c $^ -o $@
 
 utils.o : ../src/utils.c
 	$(C) $(CPPFLAGS) -c $^ -o $@
 
+log.o : ../src/log.c
+	$(C) $(CPPFLAGS) -c $^ -o $@
 
 clean:
 	rm -f *.o
-	rm -f test
+	rm -f test-utils
