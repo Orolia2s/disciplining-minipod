@@ -45,6 +45,12 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(ctrl_load_nodes, DOUBLE_ARRAY),
 	CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY),
 	CONFIG_ENTRY(debug, BOOL),
+	CONFIG_ENTRY(reactivity_min, INT),
+	CONFIG_ENTRY(reactivity_max, INT),
+	CONFIG_ENTRY(reactivity_power, INT),
+	CONFIG_ENTRY(nb_calibration, INT),
+	CONFIG_ENTRY(fine_stop_tolerance, INT),
+	CONFIG_ENTRY(settling_time, INT),
 };
 
 static inline void print_parameters(struct parameters *params) {
@@ -59,6 +65,12 @@ static inline void print_parameters(struct parameters *params) {
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
 		info("ctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
 	}
+	info("reactivity_min: %d \n", params->reactivity_min);
+	info("reactivity_max: %d \n", params->reactivity_max);
+	info("reactivity_power: %d \n", params->reactivity_power);
+	info("nb_calibration: %d \n", params->nb_calibration);
+	info("fine_stop_tolerance: %d \n", params->fine_stop_tolerance);
+	info("settling_time %d\n", params->settling_time);
 }
 
 int fill_parameters(struct parameters *p, const char *path, char err_msg[]);

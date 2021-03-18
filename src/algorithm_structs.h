@@ -11,6 +11,12 @@ struct parameters {
 	double *ctrl_load_nodes;
 	double *ctrl_drift_coeffs;
 	bool debug;
+	int reactivity_min;
+	int reactivity_max;
+	int reactivity_power;
+	int nb_calibration;
+	int fine_stop_tolerance;
+	int settling_time;
 };
 
 struct kalman_parameters {
@@ -33,7 +39,6 @@ struct algorithm_state {
 	double mRO_coarse_step_sensitivity;
 	bool coarse_ctrl;
 	bool invalid_ctrl;
-	int settling_time;
 	bool calib;
 	uint32_t ctrl_range_coarse[2];
 	uint16_t ctrl_range_fine[2];

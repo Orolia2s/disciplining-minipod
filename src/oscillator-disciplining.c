@@ -16,25 +16,11 @@
 
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
-#define SETTLING_TIME 5
 
 #define COARSE_RANGE_MIN 0
 #define COARSE_RANGE_MAX 4194303
 #define FINE_RANGE_MIN 1600
 #define FINE_RANGE_MAX 3200
-
-#define TOLERANCE_CHECK_MRO 200
-
-/* Constants for get_reactivity function */
-/* min should not go below a few settling times */
-#define REACTIVITY_MIN 20
-/* max should ideally correspond to the timescale of optimal oscillator stability.*/
-#define REACTIVITY_MAX 80
-/* # Increase for flatter top -> extend zone of maximal stability. Decrease for more peaked profile (more reactive) */
-#define REACTIVITY_POWER 4
-
-/* Number of calibration points needed for each control points */
-#define NB_CALIBRATION 30
 
 struct od {
     struct algorithm_state state;
@@ -55,7 +41,6 @@ static int init_algorithm_state(struct od * od) {
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
 	state->coarse_ctrl = false;
 	state->invalid_ctrl = false;
-	state->settling_time = SETTLING_TIME;
 	state->calib = false;
 	state->status = INIT;
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
@@ -121,19 +106,20 @@ static int init_algorithm_state(struct od * od) {
  * init_control_mRO must be called after a coarse change.
  */
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
-	if (od->state.calib
-		&& (od->state.estimated_equilibrium >= (uint32_t) od->state.ctrl_range_fine[0]-TOLERANCE_CHECK_MRO
-		|| od->state.estimated_equilibrium <= (uint32_t) od->state.ctrl_range_fine[1]-TOLERANCE_CHECK_MRO)
+	struct algorithm_state* state = &(od->state);
+	if (state->calib
+		&& (state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]-od->params.fine_stop_tolerance
+		|| state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-od->params.fine_stop_tolerance)
 	) {
 		/* estimated equilibrium is in tolerance range and no calibration is running */
 		return true;
-	} else if (od->state.calib) {
+	} else if (state->calib) {
 		/* Adjusting coarse alignment base on calibration */
-		int32_t delta_mid_fine = (int32_t) od->state.estimated_equilibrium - od->state.fine_mid;
+		int32_t delta_mid_fine = (int32_t) state->estimated_equilibrium - state->fine_mid;
 		int32_t delta_coarse = (int32_t) round(
 			delta_mid_fine
-			* od->state.mRO_coarse_step_sensitivity
-			/ od->state.mRO_coarse_step_sensitivity
+			* state->mRO_coarse_step_sensitivity
+			/ state->mRO_coarse_step_sensitivity
 		);
 		if (abs(delta_coarse) > 30) {
 			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
@@ -154,9 +140,9 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 	}
 }
 
-static double get_reactivity(double phase_ns, int sigma) {
-	double r = REACTIVITY_MAX * exp(-pow(phase_ns/sigma, REACTIVITY_POWER));
-	return r > REACTIVITY_MIN ? r : REACTIVITY_MIN;
+static double get_reactivity(double phase_ns, int sigma, int min, int max, int power) {
+	double r = max * exp(-pow(phase_ns/sigma, power));
+	return r > min ? r : min;
 }
 
 static double filter_phase(struct kalman_parameters *kalman, double phase, int interval, double estimated_drift) {
@@ -272,7 +258,7 @@ int od_process(struct od *od, const struct od_input *input,
 	if (input->valid && input->lock)
 	{
 		/* Invalid control value, need to check mRO control values */
-		if (od->state.invalid_ctrl) // Add od->params.ctrl_drift_coeffs == NULL or included in invalid_ctrl ?
+		if (state->invalid_ctrl) // Add od->params.ctrl_drift_coeffs == NULL or included in invalid_ctrl ?
 		{
 			if(!control_check_mRO(od, input, output))
 			{
@@ -284,31 +270,31 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 		}
 
-		if (od->state.status == INIT)
+		if (state->status == INIT)
 		{
-			debug("INIT: Applying estimated equilibrium setpoint %u", od->state.estimated_equilibrium);
+			debug("INIT: Applying estimated equilibrium setpoint %u", state->estimated_equilibrium);
 			output->action = ADJUST_FINE;
-			output->setpoint = od->state.estimated_equilibrium;
-			od->state.status = PHASE_ADJUSTMENT;
+			output->setpoint = state->estimated_equilibrium;
+			state->status = PHASE_ADJUSTMENT;
 			return 0;
 		}
 		else
 		{
-			if (labs(input->phase_error.tv_nsec) < od->params.phase_jump_threshold_ns)
+			if (labs(input->phase_error.tv_nsec) < params->phase_jump_threshold_ns)
 			{
 				/* Call Main loop */
 				double phase = input->phase_error.tv_nsec;
 				double filtered_phase = filter_phase(
-					&(od->state.kalman),
+					&(state->kalman),
 					phase,
-					od->params.ref_fluctuations_ns,
-					od->state.estimated_drift
+					params->ref_fluctuations_ns,
+					state->estimated_drift
 				);
 				double innovation = phase - filtered_phase;
 
 				double x;
-				if (fabs(phase) <= od->params.ref_fluctuations_ns
-					&& fabs(innovation) <= od->params.ref_fluctuations_ns)
+				if (fabs(phase) <= params->ref_fluctuations_ns
+					&& fabs(innovation) <= params->ref_fluctuations_ns)
 				{
 					x = filtered_phase;
 					debug("Using filtered phase\n");
@@ -318,17 +304,23 @@ int od_process(struct od *od, const struct od_input *input,
 					x = phase;
 				}
 
-				double r = get_reactivity(fabs(x), od->params.ref_fluctuations_ns);
+				double r = get_reactivity(
+					fabs(x),
+					params->ref_fluctuations_ns,
+					params->reactivity_min,
+					params->reactivity_max,
+					params->reactivity_power
+				);
 				double  react_coeff = - x / r;
 
-				double ctrl_points_double[od->params.ctrl_nodes_length];
-				for (int i = 0; i < od->params.ctrl_nodes_length; i++)
-					ctrl_points_double[i] = (double) od->state.ctrl_points[i];
+				double ctrl_points_double[params->ctrl_nodes_length];
+				for (int i = 0; i < params->ctrl_nodes_length; i++)
+					ctrl_points_double[i] = (double) state->ctrl_points[i];
 				double interp_value;
 				ret = lin_interp(
 					ctrl_points_double,
-					od->params.ctrl_drift_coeffs,
-					od->params.ctrl_nodes_length,
+					params->ctrl_drift_coeffs,
+					params->ctrl_nodes_length,
 					Y_INTERPOLATION,
 					react_coeff,
 					&interp_value
@@ -340,18 +332,18 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 
 				info("New fine ctrl value is %f\n", interp_value);
-				od->state.fine_ctrl_value = (uint16_t) round(interp_value);
+				state->fine_ctrl_value = (uint16_t) round(interp_value);
 
-				if (od->state.fine_ctrl_value >= od->state.ctrl_range_fine[0]
-					&& od->state.fine_ctrl_value <= od->state.ctrl_range_fine[1])
+				if (state->fine_ctrl_value >= state->ctrl_range_fine[0]
+					&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
 				{
-					od->state.estimated_drift = react_coeff;
+					state->estimated_drift = react_coeff;
 					output->action = ADJUST_FINE;
-					output->setpoint = od->state.fine_ctrl_value;
+					output->setpoint = state->fine_ctrl_value;
 				}
 				else
 				{
-					if (od->state.coarse_ctrl)
+					if (state->coarse_ctrl)
 					{
 						err("Error: Not implemented\n");
 						return -1;
@@ -361,26 +353,26 @@ int od_process(struct od *od, const struct od_input *input,
 						info("Control value %u is out of range! Decrease reactivity or \
 							allow a lower phase jump threshold for quicker convergence. \
 							If this persists consider activating coarse control",
-							od->state.fine_ctrl_value
+							state->fine_ctrl_value
 						);
 					
 						double stop_value;
 						
-						if (od->state.fine_ctrl_value < od->state.ctrl_range_fine[0])
-							stop_value = od->state.ctrl_range_fine[0];
+						if (state->fine_ctrl_value < state->ctrl_range_fine[0])
+							stop_value = state->ctrl_range_fine[0];
 						else
-							stop_value = od->state.ctrl_range_fine[1];
+							stop_value = state->ctrl_range_fine[1];
 						
-						double ctrl_points_double[od->params.ctrl_nodes_length];
-						for (int i = 0; i < od->params.ctrl_nodes_length; i++)
-							ctrl_points_double[i] = (double) od->state.ctrl_points[i];
+						double ctrl_points_double[params->ctrl_nodes_length];
+						for (int i = 0; i < params->ctrl_nodes_length; i++)
+							ctrl_points_double[i] = (double) state->ctrl_points[i];
 						ret = lin_interp(
 							ctrl_points_double,
-							od->params.ctrl_drift_coeffs,
-							od->params.ctrl_nodes_length,
+							params->ctrl_drift_coeffs,
+							params->ctrl_nodes_length,
 							X_INTERPOLATION,
 							stop_value,
-							&od->state.estimated_drift
+							&state->estimated_drift
 						);
 						
 						if (ret < 0)
@@ -404,9 +396,9 @@ int od_process(struct od *od, const struct od_input *input,
 		
 
 	} else {
-		od->state.status = HOLDOVER;
+		state->status = HOLDOVER;
 		output->action = ADJUST_FINE;
-		output->setpoint = od->state.estimated_equilibrium;
+		output->setpoint = state->estimated_equilibrium;
 		return 0;
 	}
 	debug("Od_process called \n");
