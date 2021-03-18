@@ -159,8 +159,8 @@ int fill_parameters(struct parameters *p, const char *path,
 	/* must be first */
 	ret = config_init(&config, path);
 	if (ret < 0) {
-		err("config_init failed");
 		err("err %s", err_msg);
+		snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
 		return ret;
 	}
 
@@ -174,7 +174,8 @@ int fill_parameters(struct parameters *p, const char *path,
 		}
 		ret = parser(value, p, key);
 		if (ret != 0) {
-			err("parsing %s failed", key->name);
+			snprintf(err_msg, OD_ERR_MSG_LEN, "parsing %s failed",
+				key->name);
 			err("err %s", err_msg);
 			return ret;
 		}
