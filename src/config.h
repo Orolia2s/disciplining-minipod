@@ -1,6 +1,16 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+/**
+ * @file config.h
+ * @brief Helper to get config parameters from file.
+ *
+ * Provides functions to analyze a given file and parse key values.
+ * These values are then parsed in parameters.h to get the parameters
+ * of the disciplining algorithm.
+ *
+ */
+
 struct config {
 	char *argz;
 	size_t len;

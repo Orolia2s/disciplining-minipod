@@ -1,5 +1,10 @@
 #ifndef UTILS_H
 #define UTILS_H
+/**
+ * @file utils.h
+ * @brief Provide mathematical functions to compute linear regression and linear interpolation.
+ *
+ */
 
 #include <stdbool.h>
 

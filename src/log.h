@@ -1,5 +1,13 @@
 #ifndef LOG_H_
 #define LOG_H_
+/**
+ * @file log.h
+ * @brief Provide leveled log implementation.
+ *
+ * Defines log levels that can be used anywhere on the project
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

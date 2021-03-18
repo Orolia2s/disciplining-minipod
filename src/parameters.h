@@ -1,5 +1,14 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
+/**
+ * @file parameters.h
+ * @brief Parse parameters from the config file.
+ *
+ * Provides one function to parse all parameters define in algorithm parameters
+ * Uses internal functions to parse different types of parameters (double, int,
+ * boolean, char, double array)
+ *
+ */
 
 #include <stdio.h>
 
