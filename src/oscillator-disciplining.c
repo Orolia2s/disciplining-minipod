@@ -107,9 +107,10 @@ static int init_algorithm_state(struct od * od) {
  */
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state* state = &(od->state);
+	struct parameters *params = &(od->params);
 	if (state->calib
-		&& (state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]-od->params.fine_stop_tolerance
-		|| state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-od->params.fine_stop_tolerance)
+		&& (state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]-params->fine_stop_tolerance
+		|| state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-params->fine_stop_tolerance)
 	) {
 		/* estimated equilibrium is in tolerance range and no calibration is running */
 		return true;
@@ -121,12 +122,12 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 			* state->mRO_coarse_step_sensitivity
 			/ state->mRO_coarse_step_sensitivity
 		);
-		if (abs(delta_coarse) > 30) {
+		if (abs(delta_coarse) > params->max_allowed_coarse) {
 			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
 			if (delta_coarse > 0) {
-				delta_coarse = 30;
+				delta_coarse = params->max_allowed_coarse;
 			} else {
-				delta_coarse = -30;
+				delta_coarse = -params->max_allowed_coarse;
 			}
 		}
 		output->setpoint = input->coarse_setpoint + delta_coarse;

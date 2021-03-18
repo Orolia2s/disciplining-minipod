@@ -17,6 +17,7 @@ struct parameters {
 	int nb_calibration;
 	int fine_stop_tolerance;
 	int settling_time;
+	int max_allowed_coarse;
 };
 
 struct kalman_parameters {

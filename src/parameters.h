@@ -51,6 +51,7 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(nb_calibration, INT),
 	CONFIG_ENTRY(fine_stop_tolerance, INT),
 	CONFIG_ENTRY(settling_time, INT),
+	CONFIG_ENTRY(max_allowed_coarse, INT),
 };
 
 static inline void print_parameters(struct parameters *params) {
