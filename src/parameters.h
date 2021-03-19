@@ -52,6 +52,7 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(fine_stop_tolerance, INT),
 	CONFIG_ENTRY(settling_time, INT),
 	CONFIG_ENTRY(max_allowed_coarse, INT),
+	CONFIG_ENTRY(calibrate_first, BOOL),
 };
 
 static inline void print_parameters(struct parameters *params) {
@@ -72,6 +73,7 @@ static inline void print_parameters(struct parameters *params) {
 	info("nb_calibration: %d \n", params->nb_calibration);
 	info("fine_stop_tolerance: %d \n", params->fine_stop_tolerance);
 	info("settling_time %d\n", params->settling_time);
+	info("Calibrate_first %s\n", params->calibrate_first ? "true" : "false");
 }
 
 int fill_parameters(struct parameters *p, const char *path, char err_msg[]);

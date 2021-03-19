@@ -258,6 +258,12 @@ int od_process(struct od *od, const struct od_input *input,
 	info("valid is %d and lock is %d\n", input->valid, input->lock);
 	if (input->valid && input->lock)
 	{
+		if (params->calibrate_first)
+		{
+			params->calibrate_first = false;
+			output->action = CALIBRATE;
+			return 0;
+		}
 		/* Invalid control value, need to check mRO control values */
 		if (state->invalid_ctrl) // Add od->params.ctrl_drift_coeffs == NULL or included in invalid_ctrl ?
 		{
