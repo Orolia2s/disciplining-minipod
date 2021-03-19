@@ -72,6 +72,7 @@ static int init_algorithm_state(struct od * od) {
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
 		state->ctrl_points[i] = (uint16_t) state->ctrl_range_fine[0] + params->ctrl_load_nodes[i] * diff_fine;
+		debug("control points number %d is at %d\n", i, state->ctrl_points[i]);
 	}
 
 	/*
@@ -96,6 +97,8 @@ static int init_algorithm_state(struct od * od) {
 		return ret;
 	}
 	state->estimated_equilibrium = (uint32_t) interpolation_value;
+	debug("Init finished !\n");
+	info("Estimated equilibirum during init is %d\n", state->estimated_equilibrium);
 
 	return 0;
 }
@@ -217,8 +220,9 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	}
 
 	log_enable_debug(od->params.debug);
-
-	print_parameters(&od->params);
+	if (od->params.debug) {
+		print_parameters(&od->params);
+	}
 
 	od->clockid = CLOCK_REALTIME;
 
@@ -253,17 +257,17 @@ int od_process(struct od *od, const struct od_input *input,
 		struct od_output *output)
 {
 	int ret;
-	info("OD_process inside loop !\n");
+	debug("od_process called !\n");
 	if (od == NULL || input == NULL || output == NULL)
 	{
 		err("At least one input variable is NULL\n");
 		return -EINVAL;
 	}
 	log_enable_debug(od->params.debug);
-	info("State is %d\n", od->state.status);
+	debug("State is %d\n", od->state.status);
 	struct algorithm_state *state = &(od->state);
 	struct parameters *params = &(od->params);
-	info("valid is %d and lock is %d\n", input->valid, input->lock);
+	debug("valid is %d and lock is %d\n", input->valid, input->lock);
 	if (input->valid && input->lock)
 	{
 		if (params->calibrate_first)
@@ -285,26 +289,27 @@ int od_process(struct od *od, const struct od_input *input,
 				* has been decided and prepared in output
 				*/
 				state->calib = false;
-				info("control_check_mro has not been passed !\n");
+				debug("control_check_mro has not been passed !\n");
 				return 0;
 			}
-			info("Control check mRO has been passed !\n");
+			debug("Control check mRO has been passed !\n");
 			state->calib = false;
 			state->status = INIT;
 		}
 
 		if (state->status == INIT)
 		{
-			debug("INIT: Applying estimated equilibrium setpoint %u", state->estimated_equilibrium);
 			output->action = ADJUST_FINE;
 			output->setpoint = state->estimated_equilibrium;
 			state->status = PHASE_ADJUSTMENT;
+			info("INIT: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
 			return 0;
 		}
 		else
 		{
 			if (labs(input->phase_error.tv_nsec) < params->phase_jump_threshold_ns)
 			{
+				debug("Entering main loop\n");
 				/* Call Main loop */
 				double phase = input->phase_error.tv_nsec;
 				double filtered_phase = filter_phase(
@@ -320,12 +325,13 @@ int od_process(struct od *od, const struct od_input *input,
 					&& fabs(innovation) <= params->ref_fluctuations_ns)
 				{
 					x = filtered_phase;
-					debug("Using filtered phase\n");
+					info("Using filtered phase\n");
 				}
 				else
 				{
 					x = phase;
 				}
+				info("phase is %f\n", x);
 
 				double r = get_reactivity(
 					fabs(x),
@@ -334,12 +340,19 @@ int od_process(struct od *od, const struct od_input *input,
 					params->reactivity_max,
 					params->reactivity_power
 				);
-				double  react_coeff = - x / r;
+				double react_coeff = - x / r;
+				info("get_recativity gives %f, react coeff is now %f\n", r, react_coeff);
 
 				double ctrl_points_double[params->ctrl_nodes_length];
 				for (int i = 0; i < params->ctrl_nodes_length; i++)
 					ctrl_points_double[i] = (double) state->ctrl_points[i];
 				double interp_value;
+				debug("Calling lin_interp\n");
+				debug("input values are:\n");
+				debug("react coeff (interpolation value) : %f\n", react_coeff);
+				for (int i = 0; i < params->ctrl_nodes_length; i++) {
+					debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
+				}
 				ret = lin_interp(
 					ctrl_points_double,
 					params->ctrl_drift_coeffs,
@@ -354,8 +367,8 @@ int od_process(struct od *od, const struct od_input *input,
 					return -1;
 				}
 
-				info("New fine ctrl value is %f\n", interp_value);
 				state->fine_ctrl_value = (uint16_t) round(interp_value);
+				info("New fine ctrl value is %f, rounded to %d\n", interp_value, state->fine_ctrl_value);
 
 				if (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 					&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
@@ -363,19 +376,20 @@ int od_process(struct od *od, const struct od_input *input,
 					state->estimated_drift = react_coeff;
 					output->action = ADJUST_FINE;
 					output->setpoint = state->fine_ctrl_value;
+					debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
+						output->setpoint, state->estimated_drift);
 				}
 				else
 				{
 					if (state->coarse_ctrl)
 					{
+						info("Error: Not implemented\n");
 						err("Error: Not implemented\n");
 						return -1;
 					}
 					else
 					{
-						info("Control value %u is out of range! Decrease reactivity or \
-							allow a lower phase jump threshold for quicker convergence. \
-							If this persists consider activating coarse control",
+						info("Control value %u is out of range! Decrease reactivity or allow a lower phase jump threshold for quicker convergence. If this persists consider recablibration\n",
 							state->fine_ctrl_value
 						);
 					
@@ -389,6 +403,13 @@ int od_process(struct od *od, const struct od_input *input,
 						double ctrl_points_double[params->ctrl_nodes_length];
 						for (int i = 0; i < params->ctrl_nodes_length; i++)
 							ctrl_points_double[i] = (double) state->ctrl_points[i];
+
+						debug("Calling lin_interp\n");
+						debug("input values are:\n");
+						debug("Stop value (interpolation value) : %f\n", stop_value);
+						for (int i = 0; i < params->ctrl_nodes_length; i++) {
+							debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
+						}
 						ret = lin_interp(
 							ctrl_points_double,
 							params->ctrl_drift_coeffs,
@@ -397,6 +418,7 @@ int od_process(struct od *od, const struct od_input *input,
 							stop_value,
 							&state->estimated_drift
 						);
+						info("Estimated drift is now %f\n", state->estimated_drift);
 						
 						if (ret < 0)
 						{
@@ -406,10 +428,14 @@ int od_process(struct od *od, const struct od_input *input,
 
 						output->action = ADJUST_FINE;
 						output->setpoint = stop_value;
+						debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
+							output->setpoint, state->estimated_drift);
+
 					}
 				}
 				return 0;
 			} else {
+				info("Requesting phase jump\n");
 				/* Phase jump needed */
 				output->action = PHASE_JUMP;
 				output->value_phase_ctrl = input->phase_error.tv_nsec;
@@ -466,6 +492,10 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 	calib_params->nb_calibration = od->params.nb_calibration;
 	calib_params->settling_time = od->params.settling_time;
 	od->state.calib = true;
+	debug("Returning calibration parameters:\n");
+	debug("length : %d\n", calib_params->length);
+	debug("nb_calibration: %d\n", calib_params->nb_calibration);
+	debug("settling_time: %d\n", calib_params->settling_time);
 	return calib_params;
 }
 
@@ -487,6 +517,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	int ret;
 	int length;
 
+	debug("od_calibrate called\n");
 	if (od == NULL || calib_params == NULL || calib_results == NULL)
 	{
 		err("od_calibration: at least one input parameter is null\n");
@@ -518,7 +549,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	/* Update drift coefficients */
-	info("Pointer of calib _results is %p\n", calib_results->measures);
 	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
 	{
 		info("Computing drift coefficients for ctrl points %d\n", od->state.ctrl_points[i]);
@@ -568,7 +598,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	info("Estimated equilibrium at %d\n", od->state.estimated_equilibrium);
 
 	for (int i = 0; i < length; i++) {
-		info("ctrl_points[%d] = %d\n", i, od->state.ctrl_points[i]);
+		debug("ctrl_points[%d] = %d\n", i, od->state.ctrl_points[i]);
 	}
 	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{

@@ -56,24 +56,24 @@ static const struct config_key config_keys[] = {
 };
 
 static inline void print_parameters(struct parameters *params) {
-	info("debug %s\n", params->debug ? "true" : "false");
-	info("ref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
-	info("phase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
-	info("phase_resolution_ns: %d\n", params->phase_resolution_ns);
-	info("ctrl_nodes_length: %d\n", params->ctrl_nodes_length);
+	debug("debug %s\n", params->debug ? "true" : "false");
+	debug("ref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
+	debug("phase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
+	debug("phase_resolution_ns: %d\n", params->phase_resolution_ns);
+	debug("ctrl_nodes_length: %d\n", params->ctrl_nodes_length);
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		info("ctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
+		debug("ctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
 	}
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		info("ctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
+		debug("ctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
 	}
-	info("reactivity_min: %d \n", params->reactivity_min);
-	info("reactivity_max: %d \n", params->reactivity_max);
-	info("reactivity_power: %d \n", params->reactivity_power);
-	info("nb_calibration: %d \n", params->nb_calibration);
-	info("fine_stop_tolerance: %d \n", params->fine_stop_tolerance);
-	info("settling_time %d\n", params->settling_time);
-	info("Calibrate_first %s\n", params->calibrate_first ? "true" : "false");
+	debug("reactivity_min: %d \n", params->reactivity_min);
+	debug("reactivity_max: %d \n", params->reactivity_max);
+	debug("reactivity_power: %d \n", params->reactivity_power);
+	debug("nb_calibration: %d \n", params->nb_calibration);
+	debug("fine_stop_tolerance: %d \n", params->fine_stop_tolerance);
+	debug("settling_time %d\n", params->settling_time);
+	debug("Calibrate_first %s\n", params->calibrate_first ? "true" : "false");
 }
 
 int fill_parameters(struct parameters *p, const char *path, char err_msg[]);
