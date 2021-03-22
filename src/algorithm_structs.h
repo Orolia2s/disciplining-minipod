@@ -33,6 +33,7 @@ enum State {
 	INIT,
 	PHASE_ADJUSTMENT,
 	HOLDOVER,
+	CALIBRATION,
 };
 
 struct algorithm_state {

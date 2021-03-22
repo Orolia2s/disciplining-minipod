@@ -108,20 +108,27 @@ static int init_algorithm_state(struct od * od) {
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state* state = &(od->state);
 	struct parameters *params = &(od->params);
+	info("Entering Control Check mRO\n");
+	info("Estimated equilibrium is %d\n", state->estimated_equilibrium);
+
 	if (state->calib
-		&& (state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]-params->fine_stop_tolerance
-		|| state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-params->fine_stop_tolerance)
+		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]+params->fine_stop_tolerance
+		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-params->fine_stop_tolerance
 	) {
+		info("Estimated equilibrium is in tolerance range and no calibration is running\n");
 		/* estimated equilibrium is in tolerance range and no calibration is running */
 		return true;
 	} else if (state->calib) {
+		info("Coarse alignment must be adjusted based on calibration\n");
 		/* Adjusting coarse alignment base on calibration */
 		int32_t delta_mid_fine = (int32_t) state->estimated_equilibrium - state->fine_mid;
 		int32_t delta_coarse = (int32_t) round(
 			delta_mid_fine
-			* state->mRO_coarse_step_sensitivity
+			* state->mRO_fine_step_sensitivity
 			/ state->mRO_coarse_step_sensitivity
 		);
+		info("Delta mid_fine is %d\n", delta_mid_fine);
+		info("Delta coarse is %d\n", delta_coarse);
 		if (abs(delta_coarse) > params->max_allowed_coarse) {
 			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
 			if (delta_coarse > 0) {
@@ -131,6 +138,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 			}
 		}
 		output->setpoint = input->coarse_setpoint + delta_coarse;
+		info("Requesting a coarse alignement to value %d\n", output->setpoint);
 		output->action = ADJUST_COARSE;
 		output->value_phase_ctrl = 0;
 		return false;
@@ -260,12 +268,15 @@ int od_process(struct od *od, const struct od_input *input,
 	{
 		if (params->calibrate_first)
 		{
+			info("Calibration requested from config file \n");
 			params->calibrate_first = false;
 			output->action = CALIBRATE;
 			return 0;
 		}
-		/* Invalid control value, need to check mRO control values */
-		if (state->invalid_ctrl) // Add od->params.ctrl_drift_coeffs == NULL or included in invalid_ctrl ?
+		/** Invalid control value, need to check mRO control values
+		 * If calibration has been done, we need to make a control check of the mRO
+		 */
+		if (state->invalid_ctrl || state->status == CALIBRATION)
 		{
 			if(!control_check_mRO(od, input, output))
 			{
@@ -273,8 +284,13 @@ int od_process(struct od *od, const struct od_input *input,
 				* Either a Coarse alignement or a calibration process
 				* has been decided and prepared in output
 				*/
+				state->calib = false;
+				info("control_check_mro has not been passed !\n");
 				return 0;
 			}
+			info("Control check mRO has been passed !\n");
+			state->calib = false;
+			state->status = INIT;
 		}
 
 		if (state->status == INIT)
@@ -476,6 +492,8 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		err("od_calibration: at least one input parameter is null\n");
 		return;
 	}
+
+	od->state.status = CALIBRATION;
 
 	if (calib_params->length != od->params.ctrl_nodes_length || calib_params->length != calib_results->length)
 	{
