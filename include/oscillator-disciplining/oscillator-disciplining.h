@@ -116,7 +116,13 @@ struct calibration_results {
 	 * a double array of size length * nb_calibration
 	*/
 	struct timespec * measures;
+	/** Number of control points.
+	 * Should be equal to calibration_parameters.length
+	 */
 	int length;
+	/** For each control points, number of phase error measures done.
+	 * Should be equal to calibration_parameters.nb_calibration
+	 */
 	int nb_calibration;
 };
 
@@ -153,7 +159,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od);
 /**
  * @brief Process calibration results to compute phase time and ctrl coeffs.
  * @param od Library context.
- * @param calib_parameters calibration parameters obtained from od_get_calibration_paramters.
+ * @param calib_params calibration parameters obtained from od_get_calibration_paramters.
  * @param calib_results calibration measures done by the daemon.
  * @return 0 on success, errno-compatible negative value or error.
  */
