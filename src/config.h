@@ -11,14 +11,26 @@
  *
  */
 
+/**
+ * @brief configuration structure used to parse config file
+ */
 struct config {
 	char *argz;
 	size_t len;
 	char *path;
 };
 
+/**
+ * @brief Init configuration structure from config file's path
+ */
 int config_init(struct config *config, const char *path);
+/**
+ * @brief get config value of a key inside config structure
+ */
 const char *config_get(const struct config *config, const char *key);
+/**
+ * @brief clean up configuration
+ */
 void config_cleanup(struct config *config);
 
 #endif /* CONFIG_H_ */

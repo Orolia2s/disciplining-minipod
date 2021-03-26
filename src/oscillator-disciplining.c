@@ -1,3 +1,12 @@
+/**
+ * @file oscillator-disciplining.c
+ * @brief liboscillator-disciplining's main file.
+ *
+ * liboscillator-disciplining is a small library responsible of abstracting
+ * disciplining algorithms used for an oscillator for which we want to control
+ * the frequency.
+ *
+ */
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -14,16 +23,28 @@
 #include "algorithm_structs.h"
 #include "log.h"
 
+/** mRO base fine step sensitivity */
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
+/** mRO base coarse step sensitivity */
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
 
+/** Minimum possible value of coarse control */
 #define COARSE_RANGE_MIN 0
+/** Maximum possible value of coarse control */
 #define COARSE_RANGE_MAX 4194303
+/** Minimum possible value of fine control */
 #define FINE_RANGE_MIN 1600
+/** Maximum possible value of fine control */
 #define FINE_RANGE_MAX 3200
 
+/**
+ * @struct od
+ * @brief Library context.
+ */
 struct od {
+    /** Algorith state */
     struct algorithm_state state;
+    /** Algorithm paramters */
     struct parameters params;
     clockid_t clockid;
 };

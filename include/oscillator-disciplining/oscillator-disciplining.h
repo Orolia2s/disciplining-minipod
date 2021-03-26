@@ -4,6 +4,7 @@
  * C library for disciplining an oscillator using miniCod algorithm.
  *
  * @see oscillator-disciplining.h for API documentation.
+ * @see algorithm_structs.h for algorithm's structures definitions.
  */
 /**
  * @file oscillator-disciplining.h
