@@ -39,7 +39,6 @@ static int init_algorithm_state(struct od * od) {
 	/* Constants */
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
-	state->coarse_ctrl = false;
 	state->invalid_ctrl = false;
 	state->calib = false;
 	state->status = INIT;
@@ -350,57 +349,48 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 				else
 				{
-					if (state->coarse_ctrl)
+					info("Control value %u is out of range! Decrease reactivity or allow a lower phase jump threshold for quicker convergence. If this persists consider recablibration\n",
+						state->fine_ctrl_value
+					);
+				
+					double stop_value;
+					
+					if (state->fine_ctrl_value < state->ctrl_range_fine[0])
+						stop_value = state->ctrl_range_fine[0];
+					else
+						stop_value = state->ctrl_range_fine[1];
+					
+					double ctrl_points_double[params->ctrl_nodes_length];
+					for (int i = 0; i < params->ctrl_nodes_length; i++)
+						ctrl_points_double[i] = (double) state->ctrl_points[i];
+
+					debug("Calling lin_interp\n");
+					debug("input values are:\n");
+					debug("Stop value (interpolation value) : %f\n", stop_value);
+					for (int i = 0; i < params->ctrl_nodes_length; i++) {
+						debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
+					}
+					ret = lin_interp(
+						ctrl_points_double,
+						params->ctrl_drift_coeffs,
+						params->ctrl_nodes_length,
+						X_INTERPOLATION,
+						stop_value,
+						&state->estimated_drift
+					);
+					info("Estimated drift is now %f\n", state->estimated_drift);
+					
+					if (ret < 0)
 					{
-						info("Error: Not implemented\n");
-						err("Error: Not implemented\n");
+						err("Error occured in lin_interp: %d\n", ret);
 						return -1;
 					}
-					else
-					{
-						info("Control value %u is out of range! Decrease reactivity or allow a lower phase jump threshold for quicker convergence. If this persists consider recablibration\n",
-							state->fine_ctrl_value
-						);
-					
-						double stop_value;
-						
-						if (state->fine_ctrl_value < state->ctrl_range_fine[0])
-							stop_value = state->ctrl_range_fine[0];
-						else
-							stop_value = state->ctrl_range_fine[1];
-						
-						double ctrl_points_double[params->ctrl_nodes_length];
-						for (int i = 0; i < params->ctrl_nodes_length; i++)
-							ctrl_points_double[i] = (double) state->ctrl_points[i];
 
-						debug("Calling lin_interp\n");
-						debug("input values are:\n");
-						debug("Stop value (interpolation value) : %f\n", stop_value);
-						for (int i = 0; i < params->ctrl_nodes_length; i++) {
-							debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
-						}
-						ret = lin_interp(
-							ctrl_points_double,
-							params->ctrl_drift_coeffs,
-							params->ctrl_nodes_length,
-							X_INTERPOLATION,
-							stop_value,
-							&state->estimated_drift
-						);
-						info("Estimated drift is now %f\n", state->estimated_drift);
-						
-						if (ret < 0)
-						{
-							err("Error occured in lin_interp: %d\n", ret);
-							return -1;
-						}
+					output->action = ADJUST_FINE;
+					output->setpoint = stop_value;
+					debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
+						output->setpoint, state->estimated_drift);
 
-						output->action = ADJUST_FINE;
-						output->setpoint = stop_value;
-						debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
-							output->setpoint, state->estimated_drift);
-
-					}
 				}
 				return 0;
 			} else {

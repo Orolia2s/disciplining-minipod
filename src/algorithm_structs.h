@@ -40,7 +40,6 @@ struct algorithm_state {
 	enum State status;
 	double mRO_fine_step_sensitivity;
 	double mRO_coarse_step_sensitivity;
-	bool coarse_ctrl;
 	bool invalid_ctrl;
 	bool calib;
 	uint32_t ctrl_range_coarse[2];
