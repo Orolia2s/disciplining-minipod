@@ -46,7 +46,6 @@ struct od {
     struct algorithm_state state;
     /** Algorithm paramters */
     struct parameters params;
-    clockid_t clockid;
 };
 
 static int init_algorithm_state(struct od * od) {
@@ -230,8 +229,6 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	if (od->params.debug) {
 		print_parameters(&od->params);
 	}
-
-	od->clockid = CLOCK_REALTIME;
 
 	ret = init_algorithm_state(od);
 	if (ret < 0) {
