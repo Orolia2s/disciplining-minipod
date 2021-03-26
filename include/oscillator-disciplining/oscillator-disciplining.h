@@ -123,15 +123,6 @@ struct calibration_results {
 
 /**
  * @brief Creates a liboscillator-disciplining context.
- * @param clockid Type of clock to use for timestamping the input data.
- * @return Context newly created, which must be destroyed by calling
- * od_destroy().
- * @deprecated replaced by od_new_from_config
- */
-struct od *od_new(clockid_t clockid) __attribute__((deprecated));
-
-/**
- * @brief Creates a liboscillator-disciplining context.
  * @param path Configuration file holding the configuration values for the
  * library.
  * @param err_msg Char buffer of size OD_ERR_MSG_LEN which will contain
@@ -140,24 +131,6 @@ struct od *od_new(clockid_t clockid) __attribute__((deprecated));
  * od_destroy().
  */
 struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN]);
-
-/**
- * @brief Returns the minimum admissible value for the DAC setpoint.
- * @param od Library context
- * @return Minimum DAC setpoint value, which comes either from the value hard-
- * coded into the library, or from the ctrl.DACmin configuration entry, if
- * specified.
- */
-uint32_t od_get_dac_min(const struct od *od);
-
-/**
- * @brief Returns the maximum admissible value for the DAC setpoint.
- * @param od Library context
- * @return Maximum DAC setpoint value, which comes either from the value hard-
- * coded into the library, or from the ctrl.DACmax configuration entry, if
- * specified.
- */
-uint32_t od_get_dac_max(const struct od *od);
 
 /**
  * @brief Processes input data using the disciplining algorithm.

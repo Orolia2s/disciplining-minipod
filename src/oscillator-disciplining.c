@@ -186,19 +186,6 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 	return kalman->Kphase;
 }
 
-struct od *od_new(clockid_t clockid)
-{
-	struct od *od;
-
-	od = calloc(1, sizeof(*od));
-	if (od == NULL)
-		return NULL;
-	od->clockid = clockid;
-
-	debug("Od_new called \n");
-	return od;
-}
-
 struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
@@ -233,24 +220,6 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	debug("Od_new_from_config called\n");
 
 	return od;
-}
-
-uint32_t od_get_dac_min(const struct od *od)
-{
-	if (od == NULL)
-		return  UINT32_MAX;
-
-	debug("Od_get_dac_min called \n");
-	return 0;
-}
-
-uint32_t od_get_dac_max(const struct od *od)
-{
-	if (od == NULL)
-		return 0;
-
-	debug("Od_get_dac_max called \n");
-	return 0;
 }
 
 int od_process(struct od *od, const struct od_input *input,
