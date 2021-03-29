@@ -489,6 +489,73 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 	return;
 }
 
+static int update_config(char * path, double * drift_coeffs, int length)
+{
+	FILE * config;
+	FILE * tmp_config;
+	char * line = NULL;
+	size_t len = 0;
+	int read;
+	int ret;
+	char * temp_file_name;
+
+	config = fopen(path, "r");
+	if (config == NULL) {
+		err("Could not open file %s\n", path);
+		return -EINVAL;
+	}
+
+	/* create <configFileName>.tmp file to store new config s*/
+	temp_file_name = malloc((strlen(path) + 5) * sizeof(char));
+	if (temp_file_name == NULL) {
+		err("Could not allocate memory for temp_file name !\n");
+		return -ENOMEM;
+	}
+	ret = sprintf(temp_file_name, "%s.tmp", path);
+	if (ret < 0) {
+		err("Error ocurred while creating temp file");
+		free(temp_file_name);
+		return -1;
+	}
+
+
+	tmp_config = fopen(temp_file_name, "wb");
+	if (tmp_config == NULL) {
+		err("Could not create temp file %s\n", temp_file_name);
+		free(temp_file_name);
+		return -1;
+	}
+
+	/* Copy all config variables except ctrl_drift_coeffs that needs to be updated */
+	while ((read = getline(&line, &len, config)) != -1) {
+		if(strncmp(line, "ctrl_drift_coeffs=", sizeof("ctrl_drift_coeffs=") - 1) == 0) {
+			fprintf(tmp_config, "ctrl_drift_coeffs=");
+			for (int i = 0; i < length; i++) {
+				fprintf(tmp_config, "%f", drift_coeffs[i]);
+				if (i < length -1) {
+					fprintf(tmp_config, ",");
+				}
+			}
+			fprintf(tmp_config, "\r\n");
+		} else {
+			fputs(line, tmp_config);
+		}
+	}
+
+	fclose(config);
+	fclose(tmp_config);
+	if (line)
+		free(line);
+
+	/* Replace old config */
+	ret = rename(temp_file_name, path);
+	if(ret < 0) {
+		err("Error occured when trying to overwrite config file\n");
+	}
+	free(temp_file_name);
+	return 0;
+}
+
 void od_calibrate(struct od *od, struct calibration_parameters *calib_params, struct calibration_results *calib_results)
 {
 	int ret;
@@ -555,6 +622,11 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		info("New drift coeffs %d is %f\n", i, od->params.ctrl_drift_coeffs[i]);
 	}
 
+	/* Save new drift coeffs in config file */
+	ret = update_config(od->params.path, od->params.ctrl_drift_coeffs, od->params.ctrl_nodes_length);
+	if (ret < 0) {
+		err("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
+	}
 	double interp_value;
 	double ctrl_points_double[length];
 	for (int i = 0; i < length; i++)
