@@ -600,6 +600,8 @@ void od_destroy(struct od **od)
 	(*od)->params.ctrl_load_nodes = NULL;
 	free((*od)->params.ctrl_drift_coeffs);
 	(*od)->params.ctrl_drift_coeffs = NULL;
+	free((*od)->params.path);
+	(*od)->params.path = NULL;
 	free(*od);
 	*od = NULL;
 	debug("Od_destroy called \n");

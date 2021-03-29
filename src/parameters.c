@@ -156,6 +156,9 @@ int fill_parameters(struct parameters *p, const char *path,
 	int ret;
 	struct config __attribute__((cleanup(config_cleanup))) config;
 
+	p->path = malloc((strlen(path) + 1) * sizeof(char));
+	strncpy(p->path, path, (strlen(path) + 1));
+
 	/* must be first */
 	ret = config_init(&config, path);
 	if (ret < 0) {

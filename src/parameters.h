@@ -56,6 +56,7 @@ static const struct config_key config_keys[] = {
 };
 
 static inline void print_parameters(struct parameters *params) {
+	debug("Config file path is %s\n", params->path);
 	debug("debug %s\n", params->debug ? "true" : "false");
 	debug("ref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
 	debug("phase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);

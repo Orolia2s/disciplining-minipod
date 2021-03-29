@@ -12,6 +12,8 @@
  * configuration file.
  */
 struct parameters {
+	/** Config file path */
+	char * path;
 	/** Used to filter phase */
 	int ref_fluctuations_ns;
 	/** Threshold above which as phase jump is requested */
