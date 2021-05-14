@@ -116,8 +116,7 @@ static int init_algorithm_state(struct od * od) {
 		return ret;
 	}
 	state->estimated_equilibrium = (uint32_t) interpolation_value;
-	debug("Init finished !\n");
-	info("Estimated equilibirum during init is %d\n", state->estimated_equilibrium);
+	info("Initialization: Estimated equilibirum is %d\n", state->estimated_equilibrium);
 
 	return 0;
 }
@@ -130,8 +129,6 @@ static int init_algorithm_state(struct od * od) {
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state* state = &(od->state);
 	struct parameters *params = &(od->params);
-	info("Entering Control Check mRO\n");
-	info("Estimated equilibrium is %d\n", state->estimated_equilibrium);
 
 	if (state->calib
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]+params->fine_stop_tolerance
@@ -186,8 +183,6 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 	/* Predict */
 	kalman->Kphase += interval * estimated_drift;
 	kalman->Ksigma += kalman->q;
-	debug("expected drift = %f\n", interval * estimated_drift);
-	debug("prior phase = %f\n", kalman->Kphase);
 
 	/* Square computing to do it once */
 	double square_Ksigma = pow(kalman->Ksigma, 2);
@@ -195,7 +190,6 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 
 	/* Update */
 	double gain = square_Ksigma / (square_Ksigma + square_r);
-	debug("Kgain = %f\n", gain);
 	double innovation = (phase - kalman->Kphase);
 	kalman->Kphase = kalman->Kphase + gain * innovation;
 	kalman->Ksigma = sqrt((square_r * square_Ksigma)
@@ -234,8 +228,6 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	if (ret < 0) {
 		err("Error occured during init_algorithm_state, err %d\n", ret);
 	}
-	debug("Od_new_from_config called\n");
-
 	return od;
 }
 
@@ -243,7 +235,6 @@ int od_process(struct od *od, const struct od_input *input,
 		struct od_output *output)
 {
 	int ret;
-	debug("od_process called !\n");
 	if (od == NULL || input == NULL || output == NULL)
 	{
 		err("At least one input variable is NULL\n");
@@ -258,7 +249,6 @@ int od_process(struct od *od, const struct od_input *input,
 	{
 		if (params->calibrate_first)
 		{
-			info("Calibration requested from config file \n");
 			params->calibrate_first = false;
 			output->action = CALIBRATE;
 			return 0;
@@ -288,14 +278,13 @@ int od_process(struct od *od, const struct od_input *input,
 			output->action = ADJUST_FINE;
 			output->setpoint = state->estimated_equilibrium;
 			state->status = PHASE_ADJUSTMENT;
-			info("INIT: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
+			info("INITIALIZATION: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
 			return 0;
 		}
 		else
 		{
 			if (labs(input->phase_error.tv_nsec) < params->phase_jump_threshold_ns)
 			{
-				debug("Entering main loop\n");
 				/* Call Main loop */
 				double phase = input->phase_error.tv_nsec;
 				double filtered_phase = filter_phase(
@@ -311,13 +300,11 @@ int od_process(struct od *od, const struct od_input *input,
 					&& fabs(innovation) <= params->ref_fluctuations_ns)
 				{
 					x = filtered_phase;
-					info("Using filtered phase\n");
 				}
 				else
 				{
 					x = phase;
 				}
-				info("phase is %f\n", x);
 
 				double r = get_reactivity(
 					fabs(x),
@@ -333,12 +320,7 @@ int od_process(struct od *od, const struct od_input *input,
 				for (int i = 0; i < params->ctrl_nodes_length; i++)
 					ctrl_points_double[i] = (double) state->ctrl_points[i];
 				double interp_value;
-				debug("Calling lin_interp\n");
-				debug("input values are:\n");
-				debug("react coeff (interpolation value) : %f\n", react_coeff);
-				for (int i = 0; i < params->ctrl_nodes_length; i++) {
-					debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
-				}
+
 				ret = lin_interp(
 					ctrl_points_double,
 					params->ctrl_drift_coeffs,
@@ -354,7 +336,6 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 
 				state->fine_ctrl_value = (uint16_t) round(interp_value);
-				info("New fine ctrl value is %f, rounded to %d\n", interp_value, state->fine_ctrl_value);
 
 				if (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 					&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
@@ -362,8 +343,6 @@ int od_process(struct od *od, const struct od_input *input,
 					state->estimated_drift = react_coeff;
 					output->action = ADJUST_FINE;
 					output->setpoint = state->fine_ctrl_value;
-					debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
-						output->setpoint, state->estimated_drift);
 				}
 				else
 				{
@@ -382,12 +361,6 @@ int od_process(struct od *od, const struct od_input *input,
 					for (int i = 0; i < params->ctrl_nodes_length; i++)
 						ctrl_points_double[i] = (double) state->ctrl_points[i];
 
-					debug("Calling lin_interp\n");
-					debug("input values are:\n");
-					debug("Stop value (interpolation value) : %f\n", stop_value);
-					for (int i = 0; i < params->ctrl_nodes_length; i++) {
-						debug("x[%d] = %f, y[%d] = %f\n", i, ctrl_points_double[i], i, params->ctrl_drift_coeffs[i]);
-					}
 					ret = lin_interp(
 						ctrl_points_double,
 						params->ctrl_drift_coeffs,
@@ -406,21 +379,15 @@ int od_process(struct od *od, const struct od_input *input,
 
 					output->action = ADJUST_FINE;
 					output->setpoint = stop_value;
-					debug("Requesting fine adjustement with value %d and estimated drift of %f\n",
-						output->setpoint, state->estimated_drift);
-
 				}
 				return 0;
 			} else {
-				info("Requesting phase jump\n");
 				/* Phase jump needed */
 				output->action = PHASE_JUMP;
 				output->value_phase_ctrl = input->phase_error.tv_nsec;
 				return 0;
 			}
 		}
-		
-
 	} else {
 		state->status = HOLDOVER;
 		output->action = ADJUST_FINE;
@@ -469,10 +436,6 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 	calib_params->nb_calibration = od->params.nb_calibration;
 	calib_params->settling_time = od->params.settling_time;
 	od->state.calib = true;
-	debug("Returning calibration parameters:\n");
-	debug("length : %d\n", calib_params->length);
-	debug("nb_calibration: %d\n", calib_params->nb_calibration);
-	debug("settling_time: %d\n", calib_params->settling_time);
 	return calib_params;
 }
 
@@ -561,7 +524,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	int ret;
 	int length;
 
-	debug("od_calibrate called\n");
 	if (od == NULL || calib_params == NULL || calib_results == NULL)
 	{
 		err("od_calibration: at least one input parameter is null\n");
@@ -595,7 +557,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	/* Update drift coefficients */
 	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
 	{
-		info("Computing drift coefficients for ctrl points %d\n", od->state.ctrl_points[i]);
 		double v[calib_params->nb_calibration];
 		for(int j = 0; j < calib_params->nb_calibration; j++)
 		{
@@ -619,7 +580,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			return;
 		}
 		od->params.ctrl_drift_coeffs[i] = func_params.a;
-		info("New drift coeffs %d is %f\n", i, od->params.ctrl_drift_coeffs[i]);
 	}
 
 	/* Save new drift coeffs in config file */
@@ -644,7 +604,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		err("od_calibrate: error occured in lin_interp, err %d\n", ret);
 	}
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
-	info("Estimated equilibrium at %d\n", od->state.estimated_equilibrium);
 
 	for (int i = 0; i < length; i++) {
 		debug("ctrl_points[%d] = %d\n", i, od->state.ctrl_points[i]);
@@ -658,7 +617,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	od->state.mRO_fine_step_sensitivity = 1E-9
 		* ( od->params.ctrl_drift_coeffs[length - 1] - od->params.ctrl_drift_coeffs[0])
 		/ ( od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] );
-	info("Estimated fine gain / step = %.21f\n", od->state.mRO_fine_step_sensitivity);
 
 	free_calibration(calib_params, calib_results);
 	return;
@@ -676,5 +634,4 @@ void od_destroy(struct od **od)
 	(*od)->params.path = NULL;
 	free(*od);
 	*od = NULL;
-	debug("Od_destroy called \n");
 }

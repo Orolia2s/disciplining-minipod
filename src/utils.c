@@ -117,9 +117,7 @@ int lin_interp(double x[], double y[], int length, bool x_interp, double interp_
 			if (index <= 0)
 				index = 0;
 		}
-		
 
-		debug("index is %d, x1 %f, interp_val %f, y1 %f, slopes %f\n", index, x[index], interp_value, y[index], slopes[index]);
 		if (slopes[index] == 0.0)
 			*interp_result = x[index];
 		else

@@ -58,8 +58,6 @@ static int double_array_parser(const char* value, struct parameters *p, const st
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = values;
 
-	debug("double_array_index %s is %p\n", key->name, values);
-
 	return 0;
 }
 
@@ -77,8 +75,6 @@ static int double_parser(const char *value, struct parameters *p,
 		return -ERANGE;
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_double;
-
-	debug("double_parser %s is %ff\n", key->name, value_double);
 
 	return 0;
 }
@@ -98,9 +94,6 @@ static int bool_parser(const char *value, struct parameters *p,
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_bool;
 
-	debug("bool parser %s is %s\n", key->name,
-		value_bool ? "true" : "false");
-
 	return 0;
 }
 
@@ -119,8 +112,6 @@ static int int_parser(const char *value, struct parameters *p,
 	location = (typeof(location))((uintptr_t)p + key->offset);
 	*location = value_int;
 
-	debug("int parser %s is %ld\n", key->name, value_int);
-
 	return 0;
 }
 
@@ -131,8 +122,6 @@ static int char_parser(const char *value, struct parameters *p,
 	char value_char = value[0];
 	location = (typeof(location)) ((uintptr_t)p + key->offset);
 	*location = value_char;
-
-	debug("char parser %s is %c\n", key->name, value_char);
 
 	return 0;
 }
