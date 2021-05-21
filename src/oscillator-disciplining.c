@@ -4,7 +4,7 @@
  *
  * liboscillator-disciplining is a small library responsible of abstracting
  * disciplining algorithms used for an oscillator for which we want to control
- * the frequency.
+ * the frequency compared to a PPS reference.
  *
  */
 #include <stdlib.h>
@@ -56,7 +56,7 @@ static int init_algorithm_state(struct od * od) {
 	struct algorithm_state *state = &od->state;
 	struct parameters *params = &od->params;
 
-	/* Constants */
+	/* Init state variables */
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
 	state->invalid_ctrl = false;
@@ -131,15 +131,13 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 	struct parameters *params = &(od->params);
 
 	if (state->calib
-		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0]+params->fine_stop_tolerance
-		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1]-params->fine_stop_tolerance
+		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + params->fine_stop_tolerance
+		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - params->fine_stop_tolerance
 	) {
 		info("Estimated equilibrium is in tolerance range and no calibration is running\n");
-		/* estimated equilibrium is in tolerance range and no calibration is running */
 		return true;
 	} else if (state->calib) {
 		info("Coarse alignment must be adjusted based on calibration\n");
-		/* Adjusting coarse alignment base on calibration */
 		int32_t delta_mid_fine = (int32_t) state->estimated_equilibrium - state->fine_mid;
 		int32_t delta_coarse = (int32_t) round(
 			delta_mid_fine
@@ -148,16 +146,16 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		);
 		info("Delta mid_fine is %d\n", delta_mid_fine);
 		info("Delta coarse is %d\n", delta_coarse);
+
 		if (abs(delta_coarse) > params->max_allowed_coarse) {
 			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
-			if (delta_coarse > 0) {
-				delta_coarse = params->max_allowed_coarse;
-			} else {
-				delta_coarse = -params->max_allowed_coarse;
-			}
+			delta_coarse = delta_coarse > 0 ?
+				params->max_allowed_coarse :
+				-params->max_allowed_coarse;
 		}
-		output->setpoint = input->coarse_setpoint + delta_coarse;
+
 		info("Requesting a coarse alignement to value %d\n", output->setpoint);
+		output->setpoint = input->coarse_setpoint + delta_coarse;
 		output->action = ADJUST_COARSE;
 		output->value_phase_ctrl = 0;
 		return false;
@@ -240,11 +238,14 @@ int od_process(struct od *od, const struct od_input *input,
 		err("At least one input variable is NULL\n");
 		return -EINVAL;
 	}
+
 	log_enable_debug(od->params.debug);
 	debug("State is %d\n", od->state.status);
 	struct algorithm_state *state = &(od->state);
 	struct parameters *params = &(od->params);
 	debug("valid is %d and lock is %d\n", input->valid, input->lock);
+
+
 	if (input->valid && input->lock)
 	{
 		if (params->calibrate_first)
@@ -298,13 +299,9 @@ int od_process(struct od *od, const struct od_input *input,
 				double x;
 				if (fabs(phase) <= params->ref_fluctuations_ns
 					&& fabs(innovation) <= params->ref_fluctuations_ns)
-				{
 					x = filtered_phase;
-				}
 				else
-				{
 					x = phase;
-				}
 
 				double r = get_reactivity(
 					fabs(x),
@@ -392,9 +389,7 @@ int od_process(struct od *od, const struct od_input *input,
 		state->status = HOLDOVER;
 		output->action = ADJUST_FINE;
 		output->setpoint = state->estimated_equilibrium;
-		return 0;
 	}
-	debug("Od_process called \n");
 	return 0;
 }
 
@@ -573,6 +568,8 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			calib_params->nb_calibration,
 			&func_params
 		);
+
+
 		if (ret < 0)
 		{
 			err("od_calibrate: error occured in simple_linear_reg, err %d\n", ret);
@@ -587,6 +584,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	if (ret < 0) {
 		err("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
 	}
+
 	double interp_value;
 	double ctrl_points_double[length];
 	for (int i = 0; i < length; i++)
@@ -603,17 +601,16 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	{
 		err("od_calibrate: error occured in lin_interp, err %d\n", ret);
 	}
+
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
 
-	for (int i = 0; i < length; i++) {
-		debug("ctrl_points[%d] = %d\n", i, od->state.ctrl_points[i]);
-	}
 	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{
 		err("Control points cannot have the same value !\n");
 		free_calibration(calib_params, calib_results);
 		return;
 	}
+
 	od->state.mRO_fine_step_sensitivity = 1E-9
 		* ( od->params.ctrl_drift_coeffs[length - 1] - od->params.ctrl_drift_coeffs[0])
 		/ ( od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] );
