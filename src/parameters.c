@@ -25,27 +25,26 @@ static int double_array_parser(const char* value, struct parameters *p, const st
 	double **location;
 	char *endptr;
 	char *ptr;
-	char delim = ',';
+	const char *delim = ",";
 	double buffer[ARRAY_SIZE_MAX];
 	int parsed = 0;
 	double value_double;
 
 	errno = 0;
 
-	ptr = strtok((char *) value, &delim);
+	ptr = strtok((char *) value, delim);
 	while (ptr != NULL)
 	{
 		if (parsed >= ARRAY_SIZE_MAX) {
 			return -ERANGE;
 		}
-
 		value_double = strtold(ptr, &endptr);
 		if (value_double == HUGE_VAL ||
 			(value_double == 0 && errno == ERANGE))
 			return -ERANGE;
 		buffer[parsed] = value_double;
-		parsed ++;
-		ptr = strtok(NULL, &delim);
+		parsed++;
+		ptr = strtok(NULL, delim);
 	}
 
 	double *values = malloc(parsed * sizeof(double));

@@ -64,6 +64,7 @@ int config_init(struct config *config, const char *path)
 	if (sret < (size_t)size)
 		return feof(f) ? -EIO : ret;
 
+	fclose(f);
 	return -argz_create_sep(string, '\n', &config->argz, &config->len);
 }
 
