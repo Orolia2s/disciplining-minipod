@@ -48,6 +48,8 @@ struct od {
     struct parameters params;
 };
 
+static int update_config(char * path, double * drift_coeffs, int length, uint32_t coarse_equilibrium);
+
 static int init_algorithm_state(struct od * od) {
 	int ret;
 	double interpolation_value;
@@ -134,7 +136,14 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + params->fine_stop_tolerance
 		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - params->fine_stop_tolerance
 	) {
-		info("Estimated equilibrium is in tolerance range and no calibration is running\n");
+		info("Estimated equilibrium is in tolerance range, saving calibration in config file\n");
+		params->coarse_equilibrium = input->coarse_setpoint;
+		/* Save new drift coeffs in config file */
+		int ret = update_config(params->path, params->ctrl_drift_coeffs, params->ctrl_nodes_length, input->coarse_setpoint);
+		if (ret < 0) {
+			err("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
+		}
+
 		return true;
 	} else if (state->calib) {
 		info("Coarse alignment must be adjusted based on calibration\n");
@@ -154,10 +163,10 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 				-params->max_allowed_coarse;
 		}
 
-		info("Requesting a coarse alignement to value %d\n", output->setpoint);
 		output->setpoint = input->coarse_setpoint + delta_coarse;
 		output->action = ADJUST_COARSE;
 		output->value_phase_ctrl = 0;
+		info("Requesting a coarse alignement to value %d\n", output->setpoint);
 		return false;
 	} else {
 		/* mRO needs to be calibrated */
@@ -276,10 +285,17 @@ int od_process(struct od *od, const struct od_input *input,
 
 		if (state->status == INIT)
 		{
-			output->action = ADJUST_FINE;
-			output->setpoint = state->estimated_equilibrium;
-			state->status = PHASE_ADJUSTMENT;
-			info("INITIALIZATION: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
+			if (input->coarse_setpoint != params->coarse_equilibrium) {
+				output->action = ADJUST_COARSE;
+				output->setpoint = params->coarse_equilibrium;
+				info("INITIALIZATION: Applying coarse equilibrium setpoint %d\n", params->coarse_equilibrium);
+			} else {
+				output->action = ADJUST_FINE;
+				output->setpoint = state->estimated_equilibrium;
+				state->status = PHASE_ADJUSTMENT;
+				info("INITIALIZATION: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
+
+			}
 			return 0;
 		}
 		else
@@ -447,7 +463,7 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 	return;
 }
 
-static int update_config(char * path, double * drift_coeffs, int length)
+static int update_config(char * path, double * drift_coeffs, int length, uint32_t coarse_equilibrium)
 {
 	FILE * config;
 	FILE * tmp_config;
@@ -484,7 +500,10 @@ static int update_config(char * path, double * drift_coeffs, int length)
 		return -1;
 	}
 
-	/* Copy all config variables except ctrl_drift_coeffs that needs to be updated */
+	/*
+	 * Copy all config variables except ctrl_drift_coeffs and
+	 * coarse_equilibrium that needs to be updated
+	 */
 	while ((read = getline(&line, &len, config)) != -1) {
 		if(strncmp(line, "ctrl_drift_coeffs=", sizeof("ctrl_drift_coeffs=") - 1) == 0) {
 			fprintf(tmp_config, "ctrl_drift_coeffs=");
@@ -494,7 +513,10 @@ static int update_config(char * path, double * drift_coeffs, int length)
 					fprintf(tmp_config, ",");
 				}
 			}
-			fprintf(tmp_config, "\r\n");
+			fprintf(tmp_config, "\n");
+		
+		} else if(strncmp(line, "coarse_equilibrium=", sizeof("coarse_equilibrium=") -1) == 0) {
+			fprintf(tmp_config, "coarse_equilibrium=%d\n", coarse_equilibrium);
 		} else {
 			fputs(line, tmp_config);
 		}
@@ -577,12 +599,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			return;
 		}
 		od->params.ctrl_drift_coeffs[i] = func_params.a;
-	}
-
-	/* Save new drift coeffs in config file */
-	ret = update_config(od->params.path, od->params.ctrl_drift_coeffs, od->params.ctrl_nodes_length);
-	if (ret < 0) {
-		err("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
 	}
 
 	double interp_value;

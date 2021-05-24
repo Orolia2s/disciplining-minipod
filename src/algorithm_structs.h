@@ -22,6 +22,8 @@ struct parameters {
 	int phase_resolution_ns;
 	/** Number of control nodes in ctrl_load_nodes */
 	int ctrl_nodes_length;
+	/** Equilibrium Coarse value define during calibration */
+	uint32_t coarse_equilibrium;
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.

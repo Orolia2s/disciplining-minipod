@@ -53,6 +53,7 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(settling_time, INT),
 	CONFIG_ENTRY(max_allowed_coarse, INT),
 	CONFIG_ENTRY(calibrate_first, BOOL),
+	CONFIG_ENTRY(coarse_equilibrium, INT),
 };
 
 static inline void print_parameters(struct parameters *params) {
@@ -75,6 +76,7 @@ static inline void print_parameters(struct parameters *params) {
 	debug("fine_stop_tolerance: %d \n", params->fine_stop_tolerance);
 	debug("settling_time %d\n", params->settling_time);
 	debug("Calibrate_first %s\n", params->calibrate_first ? "true" : "false");
+	debug("Coarse equilibrium: %d\n", params->coarse_equilibrium);
 }
 
 int fill_parameters(struct parameters *p, const char *path, char err_msg[]);
