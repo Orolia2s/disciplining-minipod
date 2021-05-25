@@ -311,6 +311,7 @@ int od_process(struct od *od, const struct od_input *input,
 					state->estimated_drift
 				);
 				double innovation = phase - filtered_phase;
+				debug("Filtered phase is %f\n", filtered_phase);
 
 				double x;
 				if (fabs(phase) <= params->ref_fluctuations_ns
