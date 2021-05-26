@@ -29,7 +29,7 @@ static int bisect_right(double values[], int length, double x) {
 	int step = 0;
 	int hi = length;
 	if (hi < 0) {
-		log_error("bisect_right: length cannot be negative!\n");
+		log_error("bisect_right: length cannot be negative!");
 		return -EINVAL;
 	}
 
@@ -48,7 +48,7 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 	double mean_y;
 	
 	if (length <= 0) {
-		log_error("simple_linear_red: length cannot be negative\n");
+		log_error("simple_linear_red: length cannot be negative");
 		return -EINVAL;
 	}
 
@@ -62,13 +62,13 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 		ss_y[i] = x[i] * (x[i] - mean_x);
 
 		if (ss_x[i] == HUGE_VAL || ss_y[i] == HUGE_VAL) {
-			log_error("HUGE_VAL detected ! ss_x[%d] is %f and ss_y[%d] is %f\n", i, ss_x[i], i, ss_y[i]);
+			log_error("HUGE_VAL detected ! ss_x[%d] is %f and ss_y[%d] is %f", i, ss_x[i], i, ss_y[i]);
 			return -ERANGE;
 		}
 	}
 	double sum_ss_y = sum(ss_y, length);
 	if (sum_ss_y == 0.0) {
-		log_error("sum_ss_y is equal to 0\n");
+		log_error("sum_ss_y is equal to 0");
 		return -EINVAL;
 	}
 	func_params->a = sum(ss_x, length) / sum_ss_y;
@@ -84,13 +84,13 @@ int lin_interp(double x[], double y[], int length, bool x_interp, double interp_
 	double slopes[length - 1];
 	int index;
 	if (length < 0) {
-		log_error("lin_interp: length cannot be negative (value is %d)\n", length);
+		log_error("lin_interp: length cannot be negative (value is %d)", length);
 		return -EINVAL;
 	}
 
 	for (int i = 0; i < length -1; i++) {
 		if (x[i+1] - x[i] == 0.0) {
-			log_error("difference between x values at %d and %d is null\n", i, i+1);
+			log_error("difference between x values at %d and %d is null", i, i+1);
 			return -EINVAL;
 		}
 		else
