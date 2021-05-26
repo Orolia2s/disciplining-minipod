@@ -91,9 +91,10 @@ static int init_algorithm_state(struct od * od) {
 		return -ENOMEM;
 
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
+	debug("Control points used:\n");
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
 		state->ctrl_points[i] = (uint16_t) state->ctrl_range_fine[0] + params->ctrl_load_nodes[i] * diff_fine;
-		debug("control points number %d is at %d\n", i, state->ctrl_points[i]);
+		debug("\t%d: %d\n", i, state->ctrl_points[i]);
 	}
 
 	/*
@@ -131,7 +132,7 @@ static int init_algorithm_state(struct od * od) {
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state* state = &(od->state);
 	struct parameters *params = &(od->params);
-
+	debug("Control Check mRO:");
 	if (state->calib
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + params->fine_stop_tolerance
 		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - params->fine_stop_tolerance
@@ -153,8 +154,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 			* state->mRO_fine_step_sensitivity
 			/ state->mRO_coarse_step_sensitivity
 		);
-		info("Delta mid_fine is %d\n", delta_mid_fine);
-		info("Delta coarse is %d\n", delta_coarse);
+		debug("Deltas: mid_fine is %d, coarse is %d\n", delta_mid_fine, delta_coarse);
 
 		if (abs(delta_coarse) > params->max_allowed_coarse) {
 			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
@@ -249,11 +249,10 @@ int od_process(struct od *od, const struct od_input *input,
 	}
 
 	log_enable_debug(od->params.debug);
-	debug("State is %d\n", od->state.status);
 	struct algorithm_state *state = &(od->state);
 	struct parameters *params = &(od->params);
-	debug("valid is %d and lock is %d\n", input->valid, input->lock);
-
+	debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d\n",
+		od->state.status, input->valid, input->lock);
 
 	if (input->valid && input->lock)
 	{
@@ -275,7 +274,7 @@ int od_process(struct od *od, const struct od_input *input,
 				* has been decided and prepared in output
 				*/
 				state->calib = false;
-				debug("control_check_mro has not been passed !\n");
+				debug("Control_check_mro has not been passed !\n");
 				return 0;
 			}
 			debug("Control check mRO has been passed !\n");
@@ -293,7 +292,7 @@ int od_process(struct od *od, const struct od_input *input,
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
 				state->status = PHASE_ADJUSTMENT;
-				info("INITIALIZATION: Applying estimated equilibrium setpoint %d\n", state->estimated_equilibrium);
+				info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d\n", state->estimated_equilibrium);
 
 			}
 			return 0;
@@ -573,6 +572,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	/* Update drift coefficients */
+	debug("CALIBRATION: Updating drift coefficients:\n");
 	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
 	{
 		double v[calib_params->nb_calibration];
@@ -600,6 +600,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			return;
 		}
 		od->params.ctrl_drift_coeffs[i] = func_params.a;
+		debug("\t[%d]: %f\n", i, od->params.ctrl_drift_coeffs[i]);
 	}
 
 	double interp_value;
@@ -620,6 +621,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
+	debug("Estimated equilibrium is now %d", od->state.estimated_equilibrium);
 
 	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{
