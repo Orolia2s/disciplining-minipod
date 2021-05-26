@@ -57,27 +57,27 @@ static const struct config_key config_keys[] = {
 };
 
 static inline void print_parameters(struct parameters *params) {
-	debug("Configuration variables set:\n");
-	debug("\tConfig file path is %s\n", params->path);
-	debug("\tdebug %s\n", params->debug ? "true" : "false");
-	debug("\tref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
-	debug("\tphase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
-	debug("\tphase_resolution_ns: %d\n", params->phase_resolution_ns);
-	debug("\tctrl_nodes_length: %d\n", params->ctrl_nodes_length);
+	log_debug("Configuration variables set:\n");
+	log_debug("\tConfig file path is %s\n", params->path);
+	log_debug("\tdebug %s\n", params->debug ? "true" : "false");
+	log_debug("\tref_fluctuations_ns: %d\n", params->ref_fluctuations_ns);
+	log_debug("\tphase_jump_threshold_ns: %d\n", params->phase_jump_threshold_ns);
+	log_debug("\tphase_resolution_ns: %d\n", params->phase_resolution_ns);
+	log_debug("\tctrl_nodes_length: %d\n", params->ctrl_nodes_length);
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		debug("\tctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
+		log_debug("\tctrl_load_nodes[%d]: is %f\n", i, params->ctrl_load_nodes[i]);
 	}
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
-		debug("\tctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
+		log_debug("\tctrl_drift_coeffs[%d]: is %f\n", i, params->ctrl_drift_coeffs[i]);
 	}
-	debug("\treactivity_min: %d \n", params->reactivity_min);
-	debug("\treactivity_max: %d \n", params->reactivity_max);
-	debug("\treactivity_power: %d \n", params->reactivity_power);
-	debug("\tnb_calibration: %d \n", params->nb_calibration);
-	debug("\tfine_stop_tolerance: %d \n", params->fine_stop_tolerance);
-	debug("\tsettling_time %d\n", params->settling_time);
-	debug("\tCalibrate_first %s\n", params->calibrate_first ? "true" : "false");
-	debug("\tCoarse equilibrium: %d\n", params->coarse_equilibrium);
+	log_debug("\treactivity_min: %d \n", params->reactivity_min);
+	log_debug("\treactivity_max: %d \n", params->reactivity_max);
+	log_debug("\treactivity_power: %d \n", params->reactivity_power);
+	log_debug("\tnb_calibration: %d \n", params->nb_calibration);
+	log_debug("\tfine_stop_tolerance: %d \n", params->fine_stop_tolerance);
+	log_debug("\tsettling_time %d\n", params->settling_time);
+	log_debug("\tCalibrate_first %s\n", params->calibrate_first ? "true" : "false");
+	log_debug("\tCoarse equilibrium: %d\n", params->coarse_equilibrium);
 }
 
 int fill_parameters(struct parameters *p, const char *path, char err_msg[]);

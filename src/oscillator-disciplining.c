@@ -91,10 +91,10 @@ static int init_algorithm_state(struct od * od) {
 		return -ENOMEM;
 
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
-	debug("Control points used:\n");
+	log_debug("Control points used:\n");
 	for (int i = 0; i < params->ctrl_nodes_length; i++) {
 		state->ctrl_points[i] = (uint16_t) state->ctrl_range_fine[0] + params->ctrl_load_nodes[i] * diff_fine;
-		debug("\t%d: %d\n", i, state->ctrl_points[i]);
+		log_debug("\t%d: %d\n", i, state->ctrl_points[i]);
 	}
 
 	/*
@@ -115,11 +115,11 @@ static int init_algorithm_state(struct od * od) {
 		&interpolation_value
 	);
 	if (ret < 0) {
-		err("Error occured during lin_interp, err %d\n", -ret);
+		log_error("Error occured during lin_interp, err %d\n", -ret);
 		return ret;
 	}
 	state->estimated_equilibrium = (uint32_t) interpolation_value;
-	info("Initialization: Estimated equilibirum is %d\n", state->estimated_equilibrium);
+	log_info("Initialization: Estimated equilibirum is %d\n", state->estimated_equilibrium);
 
 	return 0;
 }
@@ -132,32 +132,32 @@ static int init_algorithm_state(struct od * od) {
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state* state = &(od->state);
 	struct parameters *params = &(od->params);
-	debug("Control Check mRO:");
+	log_debug("Control Check mRO:");
 	if (state->calib
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + params->fine_stop_tolerance
 		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - params->fine_stop_tolerance
 	) {
-		info("Estimated equilibrium is in tolerance range, saving calibration in config file\n");
+		log_info("Estimated equilibrium is in tolerance range, saving calibration in config file\n");
 		params->coarse_equilibrium = input->coarse_setpoint;
 		/* Save new drift coeffs in config file */
 		int ret = update_config(params->path, params->ctrl_drift_coeffs, params->ctrl_nodes_length, input->coarse_setpoint);
 		if (ret < 0) {
-			err("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
+			log_error("Error updating configuration with new drift coefficients ! Calibration must be done again next time \n");
 		}
 
 		return true;
 	} else if (state->calib) {
-		info("Coarse alignment must be adjusted based on calibration\n");
+		log_info("Coarse alignment must be adjusted based on calibration\n");
 		int32_t delta_mid_fine = (int32_t) state->estimated_equilibrium - state->fine_mid;
 		int32_t delta_coarse = (int32_t) round(
 			delta_mid_fine
 			* state->mRO_fine_step_sensitivity
 			/ state->mRO_coarse_step_sensitivity
 		);
-		debug("Deltas: mid_fine is %d, coarse is %d\n", delta_mid_fine, delta_coarse);
+		log_debug("Deltas: mid_fine is %d, coarse is %d\n", delta_mid_fine, delta_coarse);
 
 		if (abs(delta_coarse) > params->max_allowed_coarse) {
-			info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
+			log_info("Large coarse change %u can lead to the loss of LOCK!", delta_coarse);
 			delta_coarse = delta_coarse > 0 ?
 				params->max_allowed_coarse :
 				-params->max_allowed_coarse;
@@ -166,7 +166,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		output->setpoint = input->coarse_setpoint + delta_coarse;
 		output->action = ADJUST_COARSE;
 		output->value_phase_ctrl = 0;
-		info("Requesting a coarse alignement to value %d\n", output->setpoint);
+		log_info("Requesting a coarse alignement to value %d\n", output->setpoint);
 		return false;
 	} else {
 		/* mRO needs to be calibrated */
@@ -222,18 +222,22 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	
 	ret = fill_parameters(&od->params, path, err_msg);
 	if (ret != 0) {
-		err("Error parsing config file !\n");
+		log_error("Error parsing config file !\n");
 		return NULL;
 	}
 
-	log_enable_debug(od->params.debug);
+	log_set_level(
+		od->params.debug ?
+		LOG_DEBUG :
+		LOG_INFO
+	);
 	if (od->params.debug) {
 		print_parameters(&od->params);
 	}
 
 	ret = init_algorithm_state(od);
 	if (ret < 0) {
-		err("Error occured during init_algorithm_state, err %d\n", ret);
+		log_error("Error occured during init_algorithm_state, err %d\n", ret);
 	}
 	return od;
 }
@@ -244,14 +248,19 @@ int od_process(struct od *od, const struct od_input *input,
 	int ret;
 	if (od == NULL || input == NULL || output == NULL)
 	{
-		err("At least one input variable is NULL\n");
+		log_error("At least one input variable is NULL\n");
 		return -EINVAL;
 	}
 
-	log_enable_debug(od->params.debug);
+	log_set_level(
+		od->params.debug ?
+		LOG_DEBUG :
+		LOG_INFO
+	);
+
 	struct algorithm_state *state = &(od->state);
 	struct parameters *params = &(od->params);
-	debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d\n",
+	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d\n",
 		od->state.status, input->valid, input->lock);
 
 	if (input->valid && input->lock)
@@ -274,10 +283,10 @@ int od_process(struct od *od, const struct od_input *input,
 				* has been decided and prepared in output
 				*/
 				state->calib = false;
-				debug("Control_check_mro has not been passed !\n");
+				log_debug("Control_check_mro has not been passed !\n");
 				return 0;
 			}
-			debug("Control check mRO has been passed !\n");
+			log_debug("Control check mRO has been passed !\n");
 			state->calib = false;
 			state->status = INIT;
 		}
@@ -287,12 +296,12 @@ int od_process(struct od *od, const struct od_input *input,
 			if (input->coarse_setpoint != params->coarse_equilibrium) {
 				output->action = ADJUST_COARSE;
 				output->setpoint = params->coarse_equilibrium;
-				info("INITIALIZATION: Applying coarse equilibrium setpoint %d\n", params->coarse_equilibrium);
+				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d\n", params->coarse_equilibrium);
 			} else {
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
 				state->status = PHASE_ADJUSTMENT;
-				info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d\n", state->estimated_equilibrium);
+				log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d\n", state->estimated_equilibrium);
 
 			}
 			return 0;
@@ -310,7 +319,7 @@ int od_process(struct od *od, const struct od_input *input,
 					state->estimated_drift
 				);
 				double innovation = phase - filtered_phase;
-				debug("Filtered phase is %f\n", filtered_phase);
+				log_debug("Filtered phase is %f\n", filtered_phase);
 
 				double x;
 				if (fabs(phase) <= params->ref_fluctuations_ns
@@ -327,7 +336,7 @@ int od_process(struct od *od, const struct od_input *input,
 					params->reactivity_power
 				);
 				double react_coeff = - x / r;
-				info("get_recativity gives %f, react coeff is now %f\n", r, react_coeff);
+				log_info("get_recativity gives %f, react coeff is now %f\n", r, react_coeff);
 
 				double ctrl_points_double[params->ctrl_nodes_length];
 				for (int i = 0; i < params->ctrl_nodes_length; i++)
@@ -344,7 +353,7 @@ int od_process(struct od *od, const struct od_input *input,
 				);
 				if (ret < 0)
 				{
-					err("Error occured in lin_interp: %d\n", ret);
+					log_error("Error occured in lin_interp: %d\n", ret);
 					return -1;
 				}
 
@@ -359,7 +368,7 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 				else
 				{
-					info("Control value %u is out of range! Decrease reactivity or allow a lower phase jump threshold for quicker convergence. If this persists consider recablibration\n",
+					log_info("Control value %u is out of range! Decrease reactivity or allow a lower phase jump threshold for quicker convergence. If this persists consider recablibration\n",
 						state->fine_ctrl_value
 					);
 				
@@ -382,11 +391,11 @@ int od_process(struct od *od, const struct od_input *input,
 						stop_value,
 						&state->estimated_drift
 					);
-					info("Estimated drift is now %f\n", state->estimated_drift);
+					log_info("Estimated drift is now %f\n", state->estimated_drift);
 					
 					if (ret < 0)
 					{
-						err("Error occured in lin_interp: %d\n", ret);
+						log_error("Error occured in lin_interp: %d\n", ret);
 						return -1;
 					}
 
@@ -413,26 +422,26 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 {
 	if (od == NULL)
 	{
-		err("Library context is null\n");
+		log_error("Library context is null\n");
 		return NULL;
 	}
 
 	if (od->params.ctrl_nodes_length <= 0)
 	{
-		err("get_calibration_parameters: Length cannot be negative\n");
+		log_error("get_calibration_parameters: Length cannot be negative\n");
 		return NULL;
 	}
 	
 	struct calibration_parameters *calib_params = malloc(sizeof(struct calibration_parameters));
 	if (calib_params == NULL)
 	{
-		err("Could not allocate memory to create calibration parameters data\n");
+		log_error("Could not allocate memory to create calibration parameters data\n");
 		return NULL;
 	}
 
 	calib_params->ctrl_points = malloc(od->params.ctrl_nodes_length * sizeof(uint16_t));
 	if (calib_params->ctrl_points == NULL) {
-		err("Could not allocate memory to create ctrl points in calibration parameters data\n");
+		log_error("Could not allocate memory to create ctrl points in calibration parameters data\n");
 		free(calib_params);
 		calib_params = NULL;
 		return NULL;
@@ -475,19 +484,19 @@ static int update_config(char * path, double * drift_coeffs, int length, uint32_
 
 	config = fopen(path, "r");
 	if (config == NULL) {
-		err("Could not open file %s\n", path);
+		log_error("Could not open file %s\n", path);
 		return -EINVAL;
 	}
 
 	/* create <configFileName>.tmp file to store new config s*/
 	temp_file_name = malloc((strlen(path) + 5) * sizeof(char));
 	if (temp_file_name == NULL) {
-		err("Could not allocate memory for temp_file name !\n");
+		log_error("Could not allocate memory for temp_file name !\n");
 		return -ENOMEM;
 	}
 	ret = sprintf(temp_file_name, "%s.tmp", path);
 	if (ret < 0) {
-		err("Error ocurred while creating temp file");
+		log_error("Error ocurred while creating temp file");
 		free(temp_file_name);
 		return -1;
 	}
@@ -495,7 +504,7 @@ static int update_config(char * path, double * drift_coeffs, int length, uint32_
 
 	tmp_config = fopen(temp_file_name, "wb");
 	if (tmp_config == NULL) {
-		err("Could not create temp file %s\n", temp_file_name);
+		log_error("Could not create temp file %s\n", temp_file_name);
 		free(temp_file_name);
 		return -1;
 	}
@@ -530,7 +539,7 @@ static int update_config(char * path, double * drift_coeffs, int length, uint32_
 	/* Replace old config */
 	ret = rename(temp_file_name, path);
 	if(ret < 0) {
-		err("Error occured when trying to overwrite config file\n");
+		log_error("Error occured when trying to overwrite config file\n");
 	}
 	free(temp_file_name);
 	return 0;
@@ -543,7 +552,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	if (od == NULL || calib_params == NULL || calib_results == NULL)
 	{
-		err("od_calibration: at least one input parameter is null\n");
+		log_error("od_calibration: at least one input parameter is null\n");
 		return;
 	}
 
@@ -551,7 +560,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	if (calib_params->length != od->params.ctrl_nodes_length || calib_params->length != calib_results->length)
 	{
-		err("od_calibrate: length mismatch\n");
+		log_error("od_calibrate: length mismatch\n");
 		free_calibration(calib_params, calib_results);
 		return;
 	}
@@ -559,7 +568,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	if (calib_params->nb_calibration != calib_results->nb_calibration)
 	{
-		err("od_calibrate: nb_calibration mismatch \n");
+		log_error("od_calibrate: nb_calibration mismatch \n");
 		free_calibration(calib_params, calib_results);
 		return;
 	}
@@ -572,7 +581,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	/* Update drift coefficients */
-	debug("CALIBRATION: Updating drift coefficients:\n");
+	log_debug("CALIBRATION: Updating drift coefficients:\n");
 	for (int i = 0; i < od->params.ctrl_nodes_length; i++)
 	{
 		double v[calib_params->nb_calibration];
@@ -595,12 +604,12 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 		if (ret < 0)
 		{
-			err("od_calibrate: error occured in simple_linear_reg, err %d\n", ret);
+			log_error("od_calibrate: error occured in simple_linear_reg, err %d\n", ret);
 			free_calibration(calib_params, calib_results);
 			return;
 		}
 		od->params.ctrl_drift_coeffs[i] = func_params.a;
-		debug("\t[%d]: %f\n", i, od->params.ctrl_drift_coeffs[i]);
+		log_debug("\t[%d]: %f\n", i, od->params.ctrl_drift_coeffs[i]);
 	}
 
 	double interp_value;
@@ -617,15 +626,15 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	);
 	if(ret < 0)
 	{
-		err("od_calibrate: error occured in lin_interp, err %d\n", ret);
+		log_error("od_calibrate: error occured in lin_interp, err %d\n", ret);
 	}
 
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
-	debug("Estimated equilibrium is now %d", od->state.estimated_equilibrium);
+	log_debug("Estimated equilibrium is now %d", od->state.estimated_equilibrium);
 
 	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{
-		err("Control points cannot have the same value !\n");
+		log_error("Control points cannot have the same value !\n");
 		free_calibration(calib_params, calib_results);
 		return;
 	}

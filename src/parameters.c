@@ -152,7 +152,7 @@ int fill_parameters(struct parameters *p, const char *path,
 	/* must be first */
 	ret = config_init(&config, path);
 	if (ret < 0) {
-		err("err %s", err_msg);
+		log_error("err %s", err_msg);
 		snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
 		return ret;
 	}
@@ -162,14 +162,14 @@ int fill_parameters(struct parameters *p, const char *path,
 		parser = parsers[key->type];
 		value = config_get(&config, key->name);
 		if (value == NULL) {
-			err("Key %s has not been found !\n", key->name);
+			log_error("Key %s has not been found !\n", key->name);
 			return -EINVAL;
 		}
 		ret = parser(value, p, key);
 		if (ret != 0) {
 			snprintf(err_msg, OD_ERR_MSG_LEN, "parsing %s failed",
 				key->name);
-			err("err %s", err_msg);
+			log_error("err %s", err_msg);
 			return ret;
 		}
 	}
