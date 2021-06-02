@@ -33,6 +33,7 @@
 
 #include "algorithm_structs.h"
 #include "log.h"
+#include "config.h"
 
 enum value_type {
 	VALUE_TYPE_DOUBLE,
@@ -97,7 +98,7 @@ static inline void print_parameters(struct parameters *params) {
 	log_debug("\tCoarse equilibrium: %d", params->coarse_equilibrium);
 }
 
-int fill_parameters(struct parameters *p, const char *path, char err_msg[]);
-
+int fill_parameters(struct config *config, struct parameters *p,
+		    const char *path, char err_msg[]);
 
 #endif /* PARAMETERS_H */

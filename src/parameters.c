@@ -153,8 +153,8 @@ static const parser_fn parsers[] = {
 };
 
 /* override the parameters which are specified in the configuration file */
-int fill_parameters(struct parameters *p, const char *path,
-		char err_msg[OD_ERR_MSG_LEN])
+int fill_parameters(struct config *config, struct parameters *p,
+		    const char *path, char err_msg[OD_ERR_MSG_LEN])
 {
 	unsigned int i;
 	const struct config_key *key;
@@ -162,14 +162,13 @@ int fill_parameters(struct parameters *p, const char *path,
 	parser_fn parser;
 	int path_size;
 	int ret;
-	struct config __attribute__((cleanup(config_cleanup))) config;
 
 	path_size = (strlen(path) + 1);
 	p->path = malloc(path_size * sizeof(char));
 	strncpy(p->path, path, path_size);
 
 	/* must be first */
-	ret = config_init(&config, path);
+	ret = config_init(config, path);
 	if (ret < 0) {
 		log_error("err %s", err_msg);
 		snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
@@ -179,7 +178,7 @@ int fill_parameters(struct parameters *p, const char *path,
 	for (i = 0; i < ARRAY_SIZE(config_keys); i++) {
 		key = config_keys + i;
 		parser = parsers[key->type];
-		value = config_get(&config, key->name);
+		value = config_get(config, key->name);
 		if (value == NULL) {
 			log_error("Key %s has not been found !\n", key->name);
 			return -EINVAL;

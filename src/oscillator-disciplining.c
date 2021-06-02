@@ -69,9 +69,10 @@ struct od {
     struct algorithm_state state;
     /** Algorithm paramters */
     struct parameters params;
+    struct config config;
 };
 
-static int update_config(char * path, double * drift_coeffs, int length, uint32_t coarse_equilibrium);
+static int update_config(struct od *od);
 
 static int init_algorithm_state(struct od * od) {
 	int ret;
@@ -165,7 +166,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		log_info("Estimated equilibrium is in tolerance range, saving calibration in config file");
 		params->coarse_equilibrium = input->coarse_setpoint;
 		/* Save new drift coeffs in config file */
-		int ret = update_config(params->path, params->ctrl_drift_coeffs, params->ctrl_nodes_length, input->coarse_setpoint);
+		int ret = update_config(od);
 		if (ret < 0) {
 			log_error("Error updating configuration with new drift coefficients ! Calibration must be done again next time");
 		}
@@ -244,8 +245,8 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	od = calloc(1, sizeof(*od));
 	if (od == NULL)
 		return NULL;
-	
-	ret = fill_parameters(&od->params, path, err_msg);
+
+	ret = fill_parameters(&od->config, &od->params, path, err_msg);
 	if (ret != 0) {
 		log_error("Error parsing config file !");
 		return NULL;
@@ -422,14 +423,14 @@ int od_process(struct od *od, const struct od_input *input,
 					log_warn("Control value %u is out of range!",state->fine_ctrl_value);
 					log_warn("Decrease reactivity or allow a lower phase jump threshold for quicker convergence.");
 					log_warn("If this persists consider recablibration");
-				
+
 					double stop_value;
-					
+
 					if (state->fine_ctrl_value < state->ctrl_range_fine[0])
 						stop_value = state->ctrl_range_fine[0];
 					else
 						stop_value = state->ctrl_range_fine[1];
-					
+
 					double ctrl_points_double[params->ctrl_nodes_length];
 					for (int i = 0; i < params->ctrl_nodes_length; i++)
 						ctrl_points_double[i] = (double) state->ctrl_points[i];
@@ -443,7 +444,7 @@ int od_process(struct od *od, const struct od_input *input,
 						&state->estimated_drift
 					);
 					log_info("Estimated drift is now %f", state->estimated_drift);
-					
+
 					if (ret < 0)
 					{
 						log_error("Error occured in lin_interp: %d", ret);
@@ -482,7 +483,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		log_error("get_calibration_parameters: Length cannot be negative");
 		return NULL;
 	}
-	
+
 	struct calibration_parameters *calib_params = malloc(sizeof(struct calibration_parameters));
 	if (calib_params == NULL)
 	{
@@ -522,7 +523,7 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 	return;
 }
 
-static int update_config(char * path, double * drift_coeffs, int length, uint32_t coarse_equilibrium)
+static int update_config(struct od *od)
 {
 	FILE * config;
 	FILE * tmp_config;
@@ -531,6 +532,8 @@ static int update_config(char * path, double * drift_coeffs, int length, uint32_
 	int read;
 	int ret;
 	char * temp_file_name;
+	char *path = od->params.path;
+	int length = od->params.ctrl_nodes_length;
 
 	config = fopen(path, "r");
 	if (config == NULL) {
@@ -567,15 +570,15 @@ static int update_config(char * path, double * drift_coeffs, int length, uint32_
 		if(strncmp(line, "ctrl_drift_coeffs=", sizeof("ctrl_drift_coeffs=") - 1) == 0) {
 			fprintf(tmp_config, "ctrl_drift_coeffs=");
 			for (int i = 0; i < length; i++) {
-				fprintf(tmp_config, "%f", drift_coeffs[i]);
+				fprintf(tmp_config, "%f", od->params.ctrl_drift_coeffs[i]);
 				if (i < length -1) {
 					fprintf(tmp_config, ",");
 				}
 			}
 			fprintf(tmp_config, "\n");
-		
+
 		} else if(strncmp(line, "coarse_equilibrium=", sizeof("coarse_equilibrium=") -1) == 0) {
-			fprintf(tmp_config, "coarse_equilibrium=%d\n", coarse_equilibrium);
+			fprintf(tmp_config, "coarse_equilibrium=%d\n", od->params.coarse_equilibrium);
 		} else {
 			fputs(line, tmp_config);
 		}
@@ -707,6 +710,7 @@ void od_destroy(struct od **od)
 	(*od)->params.ctrl_drift_coeffs = NULL;
 	free((*od)->params.path);
 	(*od)->params.path = NULL;
+	config_cleanup(&((*od)->config));
 	free(*od);
 	*od = NULL;
 }
