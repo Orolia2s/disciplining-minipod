@@ -26,6 +26,7 @@
  */
 
 #include <stdbool.h>
+#include <stdio.h>
 
 /** Define to use for interp_value of lin_interp function */
 #define X_INTERPOLATION true
@@ -62,5 +63,9 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
  */
 
 int lin_interp(double x[], double y[], int length, bool x_interp, double interp_value, double *interp_result);
+
+void file_cleanup(FILE **f);
+void string_cleanup(char **s);
+void fd_cleanup(int *fd);
 
 #endif /* UTILS_H */

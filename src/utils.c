@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 static double sum(double values[], int length) {
 	double sum = 0.0;
@@ -145,3 +147,31 @@ int lin_interp(double x[], double y[], int length, bool x_interp, double interp_
 
 	return 0;
 }
+
+void file_cleanup(FILE **f)
+{
+	if (f == NULL || *f == NULL)
+		return;
+
+	fclose(*f);
+	*f = NULL;
+}
+
+void string_cleanup(char **s)
+{
+	if (s == NULL || *s == NULL)
+		return;
+
+	free(*s);
+	*s = NULL;
+}
+
+void fd_cleanup(int *fd)
+{
+	if (fd == NULL)
+		return;
+
+	close(*fd);
+	*fd = -1;
+}
+
