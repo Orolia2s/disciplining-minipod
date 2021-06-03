@@ -159,35 +159,84 @@ int fill_parameters(struct config *config, struct parameters *p,
 	unsigned int i;
 	const struct config_key *key;
 	const char *value;
+	char *value_cpy= NULL;
 	parser_fn parser;
 	int path_size;
 	int ret;
+	bool use_factory = false;
+
+	log_info("start config init");
 
 	path_size = (strlen(path) + 1);
 	p->path = malloc(path_size * sizeof(char));
 	strncpy(p->path, path, path_size);
 
 	/* must be first */
+	config->defconfig_key = "eeprom";
 	ret = config_init(config, path);
 	if (ret < 0) {
-		log_error("err %s", err_msg);
-		snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
-		return ret;
+               log_error("err %s", err_msg);
+               snprintf(err_msg, OD_ERR_MSG_LEN, "config_init failed");
+               return ret;
 	}
+
+	value = config_get(config, "oscillator_factory_settings");
+	use_factory = (value != NULL && !strcmp(value, "true"));
+	log_info("use_factory = %d", use_factory);
 
 	for (i = 0; i < ARRAY_SIZE(config_keys); i++) {
 		key = config_keys + i;
+		if (use_factory && 
+		    (!strcmp(key->name, "coarse_equilibrium") ||
+		     !strcmp(key->name, "ctrl_drift_coeffs")))
+			continue;
 		parser = parsers[key->type];
 		value = config_get(config, key->name);
 		if (value == NULL) {
 			log_error("Key %s has not been found !\n", key->name);
 			return -EINVAL;
 		}
-		ret = parser(value, p, key);
+		value_cpy = strdup(value);
+
+		ret = parser(value_cpy, p, key);
+		free(value_cpy);
 		if (ret != 0) {
 			snprintf(err_msg, OD_ERR_MSG_LEN, "parsing %s failed",
 				key->name);
 			log_error("err %s", err_msg);
+			return ret;
+		}
+	}
+	if (use_factory) {
+		parser = double_array_parser;
+		value = config_get(config, "coarse_equilibrium_factory");
+		if (value == NULL) {
+			log_error("No factory settings present in eeprom\n");
+			return -EINVAL;
+		}
+		value_cpy = strdup(value);
+		log_info("using factory coarse_equilibrium [%s]", value);
+		ret = parser(value_cpy, p,
+			     &(struct config_key)
+			     CONFIG_ENTRY(coarse_equilibrium, DOUBLE_ARRAY));
+		free(value_cpy);
+		if (ret != 0) {
+			log_error("parsing coarse_equilibrium_factory failed");
+			return ret;
+		}
+		value = config_get(config, "ctrl_drift_coeffs_factory");
+		if (value == NULL) {
+			log_error("No factory settings present in eeprom\n");
+			return -EINVAL;
+		}
+		value_cpy = strdup(value);
+		log_info("using factory ctrl_drif_coeffs [%s]", value);
+		ret = parser(value_cpy, p,
+			     &(struct config_key)
+			     CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY));
+		free(value_cpy);
+		if (ret != 0) {
+			log_error("parsing ctrl_drift_coeffs_factory failed");
 			return ret;
 		}
 	}

@@ -525,76 +525,60 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 
 static int update_config(struct od *od)
 {
-	FILE * config;
-	FILE * tmp_config;
-	char * line = NULL;
-	size_t len = 0;
-	int read;
-	int ret;
-	char * temp_file_name;
+	FILE __attribute__((cleanup(file_cleanup)))*config= NULL;
+	FILE __attribute__((cleanup(file_cleanup)))*eeprom= NULL;
+	char __attribute__((cleanup(string_cleanup)))*coefs_str = NULL;
 	char *path = od->params.path;
+	const char *eeprom_path;
 	int length = od->params.ctrl_nodes_length;
+	char strce[20];
+	char data[1024]; // size of eeprom
+	int i;
+	int o;
+	int ret;
 
-	config = fopen(path, "r");
+	// (10*length + length-1 commas) + 1 ('\0') = 11
+	// ... but 16 to be safe :) 
+	coefs_str = malloc(16*length);
+	o = 0; 
+	for (i = 0; i < length ; i++) {
+		ret = snprintf(coefs_str + o, 10, "%.6f",
+			       od->params.ctrl_drift_coeffs[i]);
+		if (ret >= 10) {
+			log_error("float str too large\n");
+			return -EINVAL;
+		}
+		o += ret;
+		if (i != length - 1)
+			coefs_str[o] = ',';
+		o+=1;
+	};
+
+	sprintf(strce, "%d", od->params.coarse_equilibrium);
+	config_set(&od->config, "coarse_equilibrium", strce);
+	config_set(&od->config, "ctrl_drift_coeffs", coefs_str);
+	config_dump(&od->config, data, sizeof(data));
+
+	config = fopen(path, "w+");
 	if (config == NULL) {
 		log_error("Could not open file %s", path);
 		return -EINVAL;
 	}
+	fwrite(data, 1, strlen(data)+1, config);
+	fwrite("\n", 1, 1, config);
 
-	/* create <configFileName>.tmp file to store new config s*/
-	temp_file_name = malloc((strlen(path) + 5) * sizeof(char));
-	if (temp_file_name == NULL) {
-		log_error("Could not allocate memory for temp_file name !");
-		return -ENOMEM;
+	eeprom_path = config_get(&od->config, "eeprom");
+	if (eeprom_path == NULL)
+		return 0;
+
+	eeprom = fopen(eeprom_path, "w+");
+	if (eeprom == NULL) {
+		log_error("Could not open file %s", eeprom_path);
+		return -EINVAL;
 	}
-	ret = sprintf(temp_file_name, "%s.tmp", path);
-	if (ret < 0) {
-		log_error("Error ocurred while creating temp file");
-		free(temp_file_name);
-		return -1;
-	}
+	fwrite(data, 1, strlen(data)+1, eeprom);
+	fwrite("\n", 1, 1, eeprom);
 
-
-	tmp_config = fopen(temp_file_name, "wb");
-	if (tmp_config == NULL) {
-		log_error("Could not create temp file %s", temp_file_name);
-		free(temp_file_name);
-		return -1;
-	}
-
-	/*
-	 * Copy all config variables except ctrl_drift_coeffs and
-	 * coarse_equilibrium that needs to be updated
-	 */
-	while ((read = getline(&line, &len, config)) != -1) {
-		if(strncmp(line, "ctrl_drift_coeffs=", sizeof("ctrl_drift_coeffs=") - 1) == 0) {
-			fprintf(tmp_config, "ctrl_drift_coeffs=");
-			for (int i = 0; i < length; i++) {
-				fprintf(tmp_config, "%f", od->params.ctrl_drift_coeffs[i]);
-				if (i < length -1) {
-					fprintf(tmp_config, ",");
-				}
-			}
-			fprintf(tmp_config, "\n");
-
-		} else if(strncmp(line, "coarse_equilibrium=", sizeof("coarse_equilibrium=") -1) == 0) {
-			fprintf(tmp_config, "coarse_equilibrium=%d\n", od->params.coarse_equilibrium);
-		} else {
-			fputs(line, tmp_config);
-		}
-	}
-
-	fclose(config);
-	fclose(tmp_config);
-	if (line)
-		free(line);
-
-	/* Replace old config */
-	ret = rename(temp_file_name, path);
-	if(ret < 0) {
-		log_error("Error occured when trying to overwrite config file");
-	}
-	free(temp_file_name);
 	return 0;
 }
 
