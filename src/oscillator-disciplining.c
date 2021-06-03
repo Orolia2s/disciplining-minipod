@@ -388,7 +388,7 @@ int od_process(struct od *od, const struct od_input *input,
 					params->reactivity_power
 				);
 				double react_coeff = - x / r;
-				log_info("get_recativity gives %f, react coeff is now %f", r, react_coeff);
+				log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
 				double ctrl_points_double[params->ctrl_nodes_length];
 				for (int i = 0; i < params->ctrl_nodes_length; i++)
