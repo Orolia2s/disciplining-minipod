@@ -45,3 +45,7 @@ Test minipod:
 make test-minipod
 ./test-minipod
 ```
+
+## License
+
+Disciplining Minipod is under GNU Lesser General Public License (LGPL).
