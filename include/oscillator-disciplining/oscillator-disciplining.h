@@ -80,6 +80,7 @@ enum output_action {
 	ADJUST_FINE,
 	ADJUST_COARSE,
 	CALIBRATE,
+	SAVE_COARSE,
 	NUM_ACTIONS,
 };
 

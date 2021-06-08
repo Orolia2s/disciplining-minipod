@@ -309,12 +309,16 @@ int od_process(struct od *od, const struct od_input *input,
 			log_debug("Control check mRO has been passed !");
 			state->calib = false;
 			state->status = INIT;
+
+			/* Request coarse value to be saved in mRO50 memory */
+			output->action = SAVE_COARSE;
+			return 0;
 		}
 
 		/* Initialization */
 		if (state->status == INIT)
 		{
-			if (input->coarse_setpoint != params->coarse_equilibrium) {
+			if (params->coarse_equilibrium >= 0 && input->coarse_setpoint != params->coarse_equilibrium) {
 				output->action = ADJUST_COARSE;
 				output->setpoint = params->coarse_equilibrium;
 				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", params->coarse_equilibrium);
