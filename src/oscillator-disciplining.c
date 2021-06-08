@@ -284,6 +284,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 	if (input->valid && input->lock)
 	{
+		/* Calibration requested in config file */
 		if (params->calibrate_first)
 		{
 			params->calibrate_first = false;
@@ -310,6 +311,7 @@ int od_process(struct od *od, const struct od_input *input,
 			state->status = INIT;
 		}
 
+		/* Initialization */
 		if (state->status == INIT)
 		{
 			if (input->coarse_setpoint != params->coarse_equilibrium) {
@@ -324,6 +326,16 @@ int od_process(struct od *od, const struct od_input *input,
 
 			}
 			return 0;
+		}
+		/* Holdover and valid flag switched to valid,
+		 * We wait for one cycle to start disciplining again
+		 */
+		else if (state->status == HOLDOVER)
+		{
+			state->status = PHASE_ADJUSTMENT;
+			output->action = ADJUST_FINE;
+			output->setpoint = state->estimated_equilibrium;
+			log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 		}
 		else
 		{
