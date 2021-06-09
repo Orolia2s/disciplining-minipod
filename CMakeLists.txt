@@ -3,6 +3,8 @@ find_package(PkgConfig)
 
 set(PROJECT_NAME "oscillator-disciplining")
 
+set(BUILD_DOC off)
+
 file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/version PACKAGE_VERSION)
 message("${PROJECT_NAME} version is ${PACKAGE_VERSION}")
 STRING(REGEX REPLACE "^([0-9]+)\\.[0-9]+\\.[0-9]+" "\\1" VERSION_MAJOR "${PACKAGE_VERSION}")
@@ -36,6 +38,3 @@ add_definitions("-DOD_REVISION=\"${PACKAGE_VERSION}\"")
 add_subdirectory(include)
 add_subdirectory(pkgconfig)
 add_subdirectory(src)
-if(BUILD_TESTS)
-    add_subdirectory(test)
-endif(BUILD_TESTS)
