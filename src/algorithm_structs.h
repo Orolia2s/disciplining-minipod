@@ -25,6 +25,7 @@
 #define ALGORITHM_STRUCTS_H
 
 #include <stdint.h>
+#include <oscillator-disciplining/oscillator-disciplining.h>
 /**
  * @struct parameters
  * @brief Structure containing all variables fetched from
@@ -93,27 +94,12 @@ struct kalman_parameters {
 };
 
 /**
- * @enum State
- * @brief Algorithm state value
- */
-enum State {
-	/** Initialization State */
-	INIT,
-	/** Phase adjustement State, nominal one */
-	PHASE_ADJUSTMENT,
-	/** Holdover state, when gnss data is not valid */
-	HOLDOVER,
-	/** Calibration state, when drift coefficients are computed */
-	CALIBRATION,
-};
-
-/**
  * @struct algorithm_state
  * @brief Algorithm data stored in od context
  */
 struct algorithm_state {
 	/** State value */
-	enum State status;
+	enum Disciplining_State status;
 	/** Frequency adjustement for one value on the fine control */
 	double mRO_fine_step_sensitivity;
 	/** Frequency adjustement for one value on the coarse control */

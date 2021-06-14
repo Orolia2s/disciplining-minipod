@@ -53,20 +53,20 @@
  * algorithm.
  */
 struct od_input {
-	/** phase error measured between the oscillator and the GNSS */
-	struct timespec phase_error;
-	/** is GNSS available (and hence, is the phase error meaningful) */
-	bool valid;
-	/** is mRO locked */
-	bool lock;
-	/** temperature, only used for logging. */
-	uint16_t temperature;
-	/** Quantization error for the next PPS (unit is ps) */
-	int32_t qErr;
-	/** Fine adjustement setpoint */
-	uint32_t fine_setpoint;
+	/** Calibration requested by software of user */
+	bool calibration_requested;
 	/** Coarse adjustement setpoint */
 	uint32_t coarse_setpoint;
+	/** Fine adjustement setpoint */
+	uint32_t fine_setpoint;
+	/** is mRO locked */
+	bool lock;
+	/** phase error measured between the oscillator and the GNSS */
+	struct timespec phase_error;
+	/** temperature, only used for logging. */
+	uint16_t temperature;
+	/** is GNSS available (and hence, is the phase error meaningful) */
+	bool valid;
 };
 
 /**
@@ -101,6 +101,21 @@ struct od_output {
 	enum output_action action;
 	/** value of the phase jump */
 	int32_t value_phase_ctrl;
+};
+
+/**
+ * @enum State
+ * @brief Algorithm state value
+ */
+enum Disciplining_State {
+	/** Initialization State */
+	INIT,
+	/** Phase adjustement State, nominal one */
+	PHASE_ADJUSTMENT,
+	/** Holdover state, when gnss data is not valid */
+	HOLDOVER,
+	/** Calibration state, when drift coefficients are computed */
+	CALIBRATION,
 };
 
 /**
@@ -191,5 +206,12 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
  * NULL.
  */
 void od_destroy(struct od **od);
+
+/**
+ * @brief Returns current algorithm status
+ * @param od Algorithm context.
+ * @return enum Disciplining_State as an int
+ */
+int od_get_status(struct od *od);
 
 #endif /* INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_ */

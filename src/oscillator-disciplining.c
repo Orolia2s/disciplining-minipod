@@ -290,8 +290,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 	if (input->valid && input->lock)
 	{
-		/* Calibration requested in config file */
-		if (params->calibrate_first)
+		if (params->calibrate_first || input->calibration_requested)
 		{
 			params->calibrate_first = false;
 			output->action = CALIBRATE;
@@ -710,4 +709,10 @@ void od_destroy(struct od **od)
 	(*od)->params.path = NULL;
 	free(*od);
 	*od = NULL;
+}
+
+int od_get_status(struct od *od) {
+	if (od == NULL)
+		return -1;
+	return od->state.status;
 }
