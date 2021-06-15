@@ -55,6 +55,10 @@
 #define FINE_RANGE_MIN 1600
 /** Maximum possible value of fine control */
 #define FINE_RANGE_MAX 3200
+/** Smooth exponential factor for estimated equilibrium
+ * used during holdover phase
+ */
+#define ALPHA_ES 0.1
 
 /**
  * @struct od
@@ -89,6 +93,7 @@ static int init_algorithm_state(struct od * od) {
 	state->ctrl_range_fine[1] = FINE_RANGE_MAX;
 	state->fine_mid = (uint16_t) (0.5 * (FINE_RANGE_MIN + FINE_RANGE_MAX));
 	state->estimated_drift = 0;
+	state->fine_ctrl_value = 0;
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = params->ref_fluctuations_ns;
@@ -139,6 +144,7 @@ static int init_algorithm_state(struct od * od) {
 	}
 	state->estimated_equilibrium = (uint32_t) interpolation_value;
 	log_info("Initialization: Estimated equilibirum is %d", state->estimated_equilibrium);
+	state->estimated_equilibrium_ES = state->estimated_equilibrium;
 
 	return 0;
 }
@@ -363,6 +369,17 @@ int od_process(struct od *od, const struct od_input *input,
 				else
 					x = phase;
 
+				if (abs(x) < params->ref_fluctuations_ns
+					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
+					|| state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+				{
+					state->estimated_equilibrium_ES =
+						(int) (ALPHA_ES * state->fine_ctrl_value
+						+ (1 - ALPHA_ES) * state->estimated_equilibrium_ES);
+					log_info("Estimated equilibrium with exponential smooth is %d",
+						state->estimated_equilibrium_ES);
+				}
+
 				double r = get_reactivity(
 					fabs(x),
 					params->ref_fluctuations_ns,
@@ -448,7 +465,7 @@ int od_process(struct od *od, const struct od_input *input,
 	} else {
 		state->status = HOLDOVER;
 		output->action = ADJUST_FINE;
-		output->setpoint = state->estimated_equilibrium;
+		output->setpoint = state->estimated_equilibrium_ES;
 	}
 	return 0;
 }

@@ -140,6 +140,8 @@ struct algorithm_state {
 	uint16_t fine_ctrl_value;
 	/** Estimated equilibrium value of the fine control */
 	uint32_t estimated_equilibrium;
+	/** Exponential Smooth of the estimated equilibrium */
+	uint32_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
 	double estimated_drift;
 	/** Kalman filter paramters */
