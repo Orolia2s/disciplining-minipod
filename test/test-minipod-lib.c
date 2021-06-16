@@ -50,7 +50,6 @@ int main()
     calib_params = od_get_calibration_parameters(od);
     assert(calib_params->length == 3);
     assert(calib_params->nb_calibration == 30);
-    assert(calib_params->settling_time == 5);
     assert(calib_params->ctrl_points[0] == 1600);
     assert(calib_params->ctrl_points[1] == 2400);
     assert(calib_params->ctrl_points[2] == 3200);

@@ -506,7 +506,6 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 
 	calib_params->length = od->params.ctrl_nodes_length;
 	calib_params->nb_calibration = od->params.nb_calibration;
-	calib_params->settling_time = od->params.settling_time;
 	od->state.calib = true;
 	return calib_params;
 }

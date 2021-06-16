@@ -74,8 +74,6 @@ struct parameters {
 	 * ctrl_range_fine[1] - fine_stop_tolerance.
 	 */
 	int fine_stop_tolerance;
-	/** Number of seconds to wait after setting fine or coarse value to oscillator */
-	int settling_time;
 	/** Maxium difference allowed when changin coarse value */
 	int max_allowed_coarse;
 	/** Triggers calibration when starting the program */

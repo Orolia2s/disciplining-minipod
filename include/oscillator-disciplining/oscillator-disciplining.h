@@ -122,8 +122,6 @@ struct calibration_parameters {
 	 * of the phase error must be done
 	 */
 	int nb_calibration;
-	/** Interval between 2 measures */
-	int settling_time;
 };
 
 /**

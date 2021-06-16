@@ -69,7 +69,6 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(reactivity_power, INT),
 	CONFIG_ENTRY(nb_calibration, INT),
 	CONFIG_ENTRY(fine_stop_tolerance, INT),
-	CONFIG_ENTRY(settling_time, INT),
 	CONFIG_ENTRY(max_allowed_coarse, INT),
 	CONFIG_ENTRY(calibrate_first, BOOL),
 	CONFIG_ENTRY(coarse_equilibrium, INT),
@@ -94,7 +93,6 @@ static inline void print_parameters(struct parameters *params) {
 	log_debug("\treactivity_power: %d", params->reactivity_power);
 	log_debug("\tnb_calibration: %d", params->nb_calibration);
 	log_debug("\tfine_stop_tolerance: %d", params->fine_stop_tolerance);
-	log_debug("\tsettling_time %d", params->settling_time);
 	log_debug("\tCalibrate_first %s", params->calibrate_first ? "true" : "false");
 	log_debug("\tCoarse equilibrium: %d", params->coarse_equilibrium);
 }
