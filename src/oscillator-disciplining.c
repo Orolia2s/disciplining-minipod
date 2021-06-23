@@ -252,8 +252,8 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 	}
 
 	log_set_level(
-		od->params.debug ?
-		LOG_DEBUG :
+		od->params.debug >= 0 ?
+		od->params.debug :
 		LOG_INFO
 	);
 	if (od->params.debug) {
@@ -278,8 +278,8 @@ int od_process(struct od *od, const struct od_input *input,
 	}
 
 	log_set_level(
-		od->params.debug ?
-		LOG_DEBUG :
+		od->params.debug >= 0 ?
+		od->params.debug :
 		LOG_INFO
 	);
 

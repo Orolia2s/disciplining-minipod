@@ -63,7 +63,7 @@ static const struct config_key config_keys[] = {
 	CONFIG_ENTRY(ctrl_nodes_length, INT),
 	CONFIG_ENTRY(ctrl_load_nodes, DOUBLE_ARRAY),
 	CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY),
-	CONFIG_ENTRY(debug, BOOL),
+	CONFIG_ENTRY(debug, INT),
 	CONFIG_ENTRY(reactivity_min, INT),
 	CONFIG_ENTRY(reactivity_max, INT),
 	CONFIG_ENTRY(reactivity_power, INT),

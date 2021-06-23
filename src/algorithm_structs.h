@@ -55,7 +55,7 @@ struct parameters {
 	 */
 	double *ctrl_drift_coeffs;
 	/** Enable debug logs */
-	bool debug;
+	int debug;
 	/** Minimal reactivity */
 	int reactivity_min;
 	/** Maximal reactivity */
