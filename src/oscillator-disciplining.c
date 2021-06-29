@@ -421,9 +421,8 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 				else
 				{
-					log_warn("Control value %u is out of range!",state->fine_ctrl_value);
-					log_warn("Decrease reactivity or allow a lower phase jump threshold for quicker convergence.");
-					log_warn("If this persists consider recablibration");
+					log_warn("Control value is out of range, if convergence is not reached"
+						"consider recalibration or other reactivity parameters");
 
 					double stop_value;
 
