@@ -257,9 +257,7 @@ struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN])
 		od->params.debug :
 		LOG_INFO
 	);
-	if (od->params.debug) {
-		print_parameters(&od->params);
-	}
+	print_parameters(&od->params);
 
 	ret = init_algorithm_state(od);
 	if (ret < 0) {
