@@ -329,6 +329,9 @@ int od_process(struct od *od, const struct od_input *input,
 				output->setpoint = params->coarse_equilibrium;
 				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", params->coarse_equilibrium);
 			} else {
+				if (params->coarse_equilibrium < 0)
+					log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
+						"consider calibration if disciplining is not efficient");
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
 				state->status = PHASE_ADJUSTMENT;
