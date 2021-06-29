@@ -187,8 +187,10 @@ int fill_parameters(struct config *config, struct parameters *p,
 	for (i = 0; i < ARRAY_SIZE(config_keys); i++) {
 		key = config_keys + i;
 		if (use_factory && 
-		    (!strcmp(key->name, "coarse_equilibrium") ||
-		     !strcmp(key->name, "ctrl_drift_coeffs")))
+			(!strcmp(key->name, "coarse_equilibrium") ||
+			!strcmp(key->name, "ctrl_drift_coeffs") ||
+			!strcmp(key->name, "ctrl_nodes_length") ||
+			!strcmp(key->name, "ctrl_load_nodes")))
 			continue;
 		parser = parsers[key->type];
 		value = config_get(config, key->name);
@@ -209,36 +211,71 @@ int fill_parameters(struct config *config, struct parameters *p,
 	}
 	if (use_factory) {
 		parser = double_array_parser;
-		value = config_get(config, "coarse_equilibrium_factory");
-		if (value == NULL) {
-			log_error("No factory settings present in eeprom\n");
-			return -EINVAL;
-		}
-		value_cpy = strdup(value);
-		log_info("using factory coarse_equilibrium [%s]", value);
-		ret = parser(value_cpy, p,
-			     &(struct config_key)
-			     CONFIG_ENTRY(coarse_equilibrium, DOUBLE_ARRAY));
-		free(value_cpy);
-		if (ret != 0) {
-			log_error("parsing coarse_equilibrium_factory failed");
-			return ret;
-		}
 		value = config_get(config, "ctrl_drift_coeffs_factory");
 		if (value == NULL) {
-			log_error("No factory settings present in eeprom\n");
+			log_error("No factory settings present in eeprom");
 			return -EINVAL;
 		}
 		value_cpy = strdup(value);
 		log_info("using factory ctrl_drif_coeffs [%s]", value);
 		ret = parser(value_cpy, p,
-			     &(struct config_key)
-			     CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY));
+			&(struct config_key)
+			CONFIG_ENTRY(ctrl_drift_coeffs, DOUBLE_ARRAY));
 		free(value_cpy);
 		if (ret != 0) {
 			log_error("parsing ctrl_drift_coeffs_factory failed");
 			return ret;
 		}
+
+		value = config_get(config, "ctrl_load_nodes_factory");
+		if (value == NULL) {
+			log_error("No factory settings present in eeprom", value);
+			return -EINVAL;
+		}
+		value_cpy = strdup(value);
+		log_info("using factory ctrl_load_nodes [%s]", value);
+		ret = parser(value_cpy, p,
+			&(struct config_key)
+			CONFIG_ENTRY(ctrl_load_nodes, DOUBLE_ARRAY));
+		free(value_cpy);
+		if (ret != 0) {
+			log_error("parsing ctrl_load_nodes_factory failed");
+			return ret;
+		}
+
+		parser = int_parser;
+		value = config_get(config, "coarse_equilibrium_factory");
+		if (value == NULL) {
+			log_error("No factory settings present in eeprom");
+			return -EINVAL;
+		}
+		value_cpy = strdup(value);
+		log_info("using factory coarse_equilibrium [%s]", value);
+		ret = parser(value_cpy, p,
+			&(struct config_key)
+			CONFIG_ENTRY(coarse_equilibrium, INT));
+		free(value_cpy);
+		if (ret != 0) {
+			log_error("parsing coarse_equilibrium_factory failed");
+			return ret;
+		}
+
+		value = config_get(config, "ctrl_nodes_length_factory");
+		if (value == NULL) {
+			log_error("No factory settings present in eeprom", value);
+			return -EINVAL;
+		}
+		value_cpy = strdup(value);
+		log_info("using factory ctrl_nodes_length [%s]", value);
+		ret = parser(value_cpy, p,
+			&(struct config_key)
+			CONFIG_ENTRY(ctrl_nodes_length, INT));
+		free(value_cpy);
+		if (ret != 0) {
+			log_error("parsing ctrl_nodes_length_factory failed");
+			return ret;
+		}
+
 	}
 
 	return 0;

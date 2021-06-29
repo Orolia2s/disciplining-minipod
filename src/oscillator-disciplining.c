@@ -557,6 +557,7 @@ static int update_config(struct od *od)
 	sprintf(strce, "%d", od->params.coarse_equilibrium);
 	config_set(&od->config, "coarse_equilibrium", strce);
 	config_set(&od->config, "ctrl_drift_coeffs", coefs_str);
+	config_set(&od->config, "calibrate_first", "false");
 	config_dump(&od->config, data, sizeof(data));
 
 	config = fopen(path, "w+");
