@@ -289,10 +289,12 @@ int od_process(struct od *od, const struct od_input *input,
 
 	if (input->valid && input->lock)
 	{
-		if (params->calibrate_first || input->calibration_requested)
+		if (od->state.status != CALIBRATION
+			&& (params->calibrate_first || input->calibration_requested))
 		{
 			params->calibrate_first = false;
 			output->action = CALIBRATE;
+			od->state.status = CALIBRATION;
 			return 0;
 		}
 		/** Invalid control value, need to check mRO control values
@@ -593,8 +595,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		log_error("od_calibration: at least one input parameter is null");
 		return;
 	}
-
-	od->state.status = CALIBRATION;
 
 	if (calib_params->length != od->params.ctrl_nodes_length || calib_params->length != calib_results->length)
 	{
