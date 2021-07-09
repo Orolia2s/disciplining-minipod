@@ -465,6 +465,8 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 		}
 	} else {
+		log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+		log_info("Applying estimated equilibirum until going out of holdover");
 		state->status = HOLDOVER;
 		output->action = ADJUST_FINE;
 		output->setpoint = state->estimated_equilibrium_ES;
