@@ -374,7 +374,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 				if (abs(x) < params->ref_fluctuations_ns
 					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					|| state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
 				{
 					state->estimated_equilibrium_ES =
 						(int) (ALPHA_ES * state->fine_ctrl_value
