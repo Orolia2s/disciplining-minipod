@@ -45,7 +45,7 @@
  * @def SETTLING_TIME
  * @brief Time elapsed between each loop of the od_process loop
  */
-#define SETTLING_TIME 5
+#define SETTLING_TIME 6
 
 /**
  * @def OD_ERR_MSG_LEN
