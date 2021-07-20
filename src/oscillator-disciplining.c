@@ -671,6 +671,8 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	od->state.estimated_equilibrium = (uint32_t) interp_value;
 	log_debug("Estimated equilibrium is now %d", od->state.estimated_equilibrium);
+	log_debug("Resetting estimated equiblibrium exponential smooth");
+	od->state.estimated_equilibrium_ES = od->state.estimated_equilibrium;
 
 	if (od->state.ctrl_points[length - 1] - od->state.ctrl_points[0] == 0)
 	{
