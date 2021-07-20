@@ -42,6 +42,12 @@
 #include <inttypes.h>
 
 /**
+ * @def SETTLING_TIME
+ * @brief Time elapsed between each loop of the od_process loop
+ */
+#define SETTLING_TIME 5
+
+/**
  * @def OD_ERR_MSG_LEN
  * @brief Required size an error message buffer must have.
  */

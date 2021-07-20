@@ -359,7 +359,7 @@ int od_process(struct od *od, const struct od_input *input,
 				double filtered_phase = filter_phase(
 					&(state->kalman),
 					phase,
-					params->ref_fluctuations_ns,
+					SETTLING_TIME,
 					state->estimated_drift
 				);
 				double innovation = phase - filtered_phase;
