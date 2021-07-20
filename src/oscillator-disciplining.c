@@ -215,6 +215,7 @@ static double filter_phase(struct kalman_parameters *kalman, double phase, int i
 
 	/* Predict */
 	kalman->Kphase += interval * estimated_drift;
+	log_debug("kalman->Kphase += interval * estimated_drift = %f", kalman->Kphase);
 	kalman->Ksigma += kalman->q;
 
 	/* Square computing to do it once */
