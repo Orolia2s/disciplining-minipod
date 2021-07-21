@@ -58,7 +58,7 @@
 /** Smooth exponential factor for estimated equilibrium
  * used during holdover phase
  */
-#define ALPHA_ES 0.1
+#define ALPHA_ES 0.05
 
 /**
  * @struct od
@@ -378,8 +378,8 @@ int od_process(struct od *od, const struct od_input *input,
 					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
 				{
 					state->estimated_equilibrium_ES =
-						(int) (ALPHA_ES * state->fine_ctrl_value
-						+ (1 - ALPHA_ES) * state->estimated_equilibrium_ES);
+						round((ALPHA_ES * state->fine_ctrl_value
+						+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
 					log_info("Estimated equilibrium with exponential smooth is %d",
 						state->estimated_equilibrium_ES);
 				}
