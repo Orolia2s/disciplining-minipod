@@ -70,7 +70,7 @@ struct od_input {
 	/** phase error measured between the oscillator and the GNSS */
 	struct timespec phase_error;
 	/** temperature, only used for logging. */
-	uint16_t temperature;
+	double temperature;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
 };
