@@ -229,7 +229,7 @@ int fill_parameters(struct config *config, struct parameters *p,
 
 		value = config_get(config, "ctrl_load_nodes_factory");
 		if (value == NULL) {
-			log_error("No factory settings present in eeprom", value);
+			log_error("No factory settings present in eeprom");
 			return -EINVAL;
 		}
 		value_cpy = strdup(value);
@@ -262,7 +262,7 @@ int fill_parameters(struct config *config, struct parameters *p,
 
 		value = config_get(config, "ctrl_nodes_length_factory");
 		if (value == NULL) {
-			log_error("No factory settings present in eeprom", value);
+			log_error("No factory settings present in eeprom");
 			return -EINVAL;
 		}
 		value_cpy = strdup(value);
