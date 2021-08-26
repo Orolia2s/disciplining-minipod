@@ -425,7 +425,7 @@ int od_process(struct od *od, const struct od_input *input,
 				else
 				{
 					log_warn("Control value is out of range, if convergence is not reached"
-						"consider recalibration or other reactivity parameters");
+						" consider recalibration or other reactivity parameters");
 
 					double stop_value;
 
