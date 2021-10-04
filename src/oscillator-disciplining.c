@@ -33,6 +33,9 @@
 #include <string.h>
 #include <stddef.h>
 #include <math.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
@@ -531,13 +534,13 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 static int update_config(struct od *od)
 {
 	FILE __attribute__((cleanup(file_cleanup)))*config= NULL;
-	FILE __attribute__((cleanup(file_cleanup)))*eeprom= NULL;
+	int eeprom = 0;
 	char __attribute__((cleanup(string_cleanup)))*coefs_str = NULL;
 	char *path = od->params.path;
 	const char *eeprom_path;
 	int length = od->params.ctrl_nodes_length;
 	char strce[20];
-	char data[1024]; // size of eeprom
+	char data[1024] = {0}; // size of eeprom
 	int i;
 	int o;
 	int ret;
@@ -576,14 +579,26 @@ static int update_config(struct od *od)
 	eeprom_path = config_get(&od->config, "eeprom");
 	if (eeprom_path == NULL)
 		return 0;
-
-	eeprom = fopen(eeprom_path, "w+");
-	if (eeprom == NULL) {
+	eeprom = open(eeprom_path, O_WRONLY);
+	if (eeprom <= 0) {
 		log_error("Could not open file %s", eeprom_path);
 		return -EINVAL;
 	}
-	fwrite(data, 1, strlen(data)+1, eeprom);
-	fwrite("\n", 1, 1, eeprom);
+
+	// Clear EEPROM memory to clean everything that was inside
+	char* zeros = calloc(1, 1024);
+	write(eeprom, zeros, 1024);
+	free(zeros);
+	close (eeprom);
+	eeprom = open(eeprom_path, O_WRONLY);
+	if (eeprom <= 0) {
+		log_error("Could not open file %s", eeprom_path);
+		return -EINVAL;
+	}
+
+	write(eeprom, data, strlen(data)+1);
+	write(eeprom, "\n", 1);
+	close(eeprom);
 
 	return 0;
 }

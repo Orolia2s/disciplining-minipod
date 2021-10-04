@@ -115,6 +115,10 @@ int config_init(struct config *config, const char *path)
 
 	ret = envz_merge(&config->argz, &config->len,
 			config->argz_defconfig, config->len_defconfig, 0);
+
+	// remove any null entry
+	envz_strip (&config->argz, &config->len);
+
 	return ret;
 }
 
