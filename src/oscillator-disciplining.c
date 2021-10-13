@@ -715,6 +715,8 @@ void od_destroy(struct od **od)
 	(*od)->params.ctrl_drift_coeffs = NULL;
 	free((*od)->params.path);
 	(*od)->params.path = NULL;
+	free((*od)->state.ctrl_points);
+	(*od)->state.ctrl_points = NULL;
 	config_cleanup(&((*od)->config));
 	free(*od);
 	*od = NULL;
