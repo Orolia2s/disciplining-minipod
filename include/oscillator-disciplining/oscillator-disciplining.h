@@ -152,6 +152,8 @@ struct od_input {
 	int32_t coarse_setpoint;
 	/** Fine adjustement setpoint */
 	uint32_t fine_setpoint;
+	/** Quantization Error **/
+	int32_t qErr;
 	/** is mRO locked */
 	bool lock;
 	/** phase error measured between the oscillator and the GNSS */
