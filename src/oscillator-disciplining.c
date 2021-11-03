@@ -62,6 +62,8 @@
  */
 #define ALPHA_ES 0.01
 
+#define PS_IN_NS 1000
+
 /**
  * @struct od
  * @brief Library context.
@@ -383,7 +385,9 @@ int od_process(struct od *od, const struct od_input *input,
 			if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
 			{
 				/* Call Main loop */
-				float phase = input->phase_error.tv_nsec;
+				log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
+				float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
+				log_debug("Phase filtered with qErr: %f", phase);
 				float filtered_phase = filter_phase(
 					&(state->kalman),
 					phase,
