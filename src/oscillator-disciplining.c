@@ -68,6 +68,8 @@
 
 #define PS_IN_NS 1000
 
+#define PS_IN_NS 1000
+
 /**
  * @struct od
  * @brief Library context.
