@@ -54,6 +54,45 @@
 #define OD_ERR_MSG_LEN 0x400
 
 /**
+ * @struct minipod_config
+ * @brief Minipod configuration
+ */
+struct minipod_config {
+		/** Used to filter phase */
+	int ref_fluctuations_ns;
+	/** Threshold above which as phase jump is requested */
+	int phase_jump_threshold_ns;
+	/** Phasemeter's resolution in ns */
+	int phase_resolution_ns;
+	/** Enable debug logs */
+	int debug;
+	/** Minimal reactivity */
+	int reactivity_min;
+	/** Maximal reactivity */
+	int reactivity_max;
+	/** Power used in reactivity computation */
+	int reactivity_power;
+	/** number of phase error measures for one control node
+	 * when doing a calibration
+	 */
+	int nb_calibration;
+	/**
+	 * Set tolerance range to check if fine equilibrium is inside this range
+	 * to validate calibration.
+	 * After a calibration fine equilibrium point must be between
+	 * ctrl_range_fine[0] + fine_stop_tolerance and
+	 * ctrl_range_fine[1] - fine_stop_tolerance.
+	 */
+	int fine_stop_tolerance;
+	/** Maxium difference allowed when changin coarse value */
+	int max_allowed_coarse;
+	/** Triggers calibration when starting the program */
+	bool calibrate_first;
+	/** Define wether to use factory settings or not */
+	bool oscillator_factory_settings;
+};
+
+/**
  * @struct od_input
  * @brief Structure containing all the input parameters for the disciplining
  * algorithm.
@@ -62,7 +101,7 @@ struct od_input {
 	/** Calibration requested by software of user */
 	bool calibration_requested;
 	/** Coarse adjustement setpoint */
-	uint32_t coarse_setpoint;
+	int32_t coarse_setpoint;
 	/** Fine adjustement setpoint */
 	uint32_t fine_setpoint;
 	/** is mRO locked */
@@ -176,7 +215,7 @@ struct calibration_results {
  * @return Context newly created, which must be destroyed by calling
  * od_destroy().
  */
-struct od *od_new_from_config(const char *path, char err_msg[OD_ERR_MSG_LEN]);
+struct od *od_new_from_config(const char *path, struct minipod_config *minipod_config, char err_msg[OD_ERR_MSG_LEN]);
 
 /**
  * @brief Processes input data using the disciplining algorithm.

@@ -26,8 +26,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static double sum(double values[], int length) {
-	double sum = 0.0;
+static float sum(float values[], int length) {
+	float sum = 0.0;
 
 	if (length <= 0) {
 		return 0.0;
@@ -45,7 +45,7 @@ static double sum(double values[], int length) {
  * The return value i is such that all e in a[:i] have e <= x, and all e in
  * a[i:] have e > x.
  */
-static int bisect_right(double values[], int length, double x) {
+static int bisect_right(float values[], int length, float x) {
 	int low = 0;
 	int step = 0;
 	int hi = length;
@@ -64,9 +64,9 @@ static int bisect_right(double values[], int length, double x) {
 	return low;
 }
 
-int simple_linear_reg(double x[], double y[], int length, struct linear_func_param * func_params) {
-	double mean_x;
-	double mean_y;
+int simple_linear_reg(float x[], float y[], int length, struct linear_func_param * func_params) {
+	float mean_x;
+	float mean_y;
 	
 	if (length <= 0) {
 		log_error("simple_linear_red: length cannot be negative");
@@ -76,8 +76,8 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 	mean_x = sum(x, length) / length;
 	mean_y = sum(y, length) / length;
 
-	double ss_x[length];
-	double ss_y[length];
+	float ss_x[length];
+	float ss_y[length];
 	for (int i = 0; i < length; i++) {
 		ss_x[i] = x[i] * (y[i] - mean_y);
 		ss_y[i] = x[i] * (x[i] - mean_x);
@@ -87,7 +87,7 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 			return -ERANGE;
 		}
 	}
-	double sum_ss_y = sum(ss_y, length);
+	float sum_ss_y = sum(ss_y, length);
 	if (sum_ss_y == 0.0) {
 		log_error("sum_ss_y is equal to 0");
 		return -EINVAL;
@@ -101,8 +101,8 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
 /* piece-wise linear interpolation/extrapolation for given x and y array in ascending order
  * x_interp: allows to choose between x interpolation or y one.
  */
-int lin_interp(double x[], double y[], int length, bool x_interp, double interp_value, double *interp_result) {
-	double slopes[length - 1];
+int lin_interp(float x[], float y[], int length, bool x_interp, float interp_value, float *interp_result) {
+	float slopes[length - 1];
 	int index;
 	if (length < 0) {
 		log_error("lin_interp: length cannot be negative (value is %d)", length);

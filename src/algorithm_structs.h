@@ -27,58 +27,50 @@
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
 /**
- * @struct parameters
- * @brief Structure containing all variables fetched from
- * configuration file.
+ * Maximum number of points that can be stored in the memory of the card
  */
-struct parameters {
-	/** Config file path */
-	char * path;
-	/** Used to filter phase */
-	int ref_fluctuations_ns;
-	/** Threshold above which as phase jump is requested */
-	int phase_jump_threshold_ns;
-	/** Phasemeter's resolution in ns */
-	int phase_resolution_ns;
+#define CALIBRATION_POINTS_MAX 10
+
+/**
+ * @struct disciplining parameters
+ * @brief Disciplining parameters corresponding to mRO50 device disciplined
+ *
+ */
+struct disciplining_parameters {
 	/** Number of control nodes in ctrl_load_nodes */
-	int ctrl_nodes_length;
-	/** Equilibrium Coarse value define during calibration */
-	int32_t coarse_equilibrium;
+	uint8_t ctrl_nodes_length;
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
-	 * Array must be of size ctrl_node_length.
+	 * Array contains ctrl_nodes_length valid values.
 	 */
-	double *ctrl_load_nodes;
+	float ctrl_load_nodes[CALIBRATION_POINTS_MAX];
 	/**
 	 * Array of drift coefficients for each control node.
-	 * Array must be of size ctrl_node_length.
+	 * Array contains ctrl_nodes_length valid values.
 	 */
-	double *ctrl_drift_coeffs;
-	/** Enable debug logs */
-	int debug;
-	/** Minimal reactivity */
-	int reactivity_min;
-	/** Maximal reactivity */
-	int reactivity_max;
-	/** Power used in reactivity computation */
-	int reactivity_power;
-	/** number of phase error measures for one control node
-	 * when doing a calibration
-	 */
-	int nb_calibration;
+	float ctrl_drift_coeffs[CALIBRATION_POINTS_MAX];
+	/** Equilibrium Coarse value define during calibration */
+	int32_t coarse_equilibrium;
+	/** Factory Settings that can be used with any mRO50 */
+	/** Number of control nodes in ctrl_load_nodes_factory */
+	uint8_t ctrl_nodes_length_factory;
 	/**
-	 * Set tolerance range to check if fine equilibrium is inside this range
-	 * to validate calibration.
-	 * After a calibration fine equilibrium point must be between
-	 * ctrl_range_fine[0] + fine_stop_tolerance and
-	 * ctrl_range_fine[1] - fine_stop_tolerance.
+	 * Array containing the control node, in percentage
+	 * value of the control range.
+	 * Array contains ctrl_nodes_length_factory valid values.
 	 */
-	int fine_stop_tolerance;
-	/** Maxium difference allowed when changin coarse value */
-	int max_allowed_coarse;
-	/** Triggers calibration when starting the program */
-	bool calibrate_first;
+	float ctrl_load_nodes_factory[3];
+	/**
+	 * Array of drift coefficients for each control node.
+	 * Array contains ctrl_nodes_length_factory valid values.
+	 */
+	float ctrl_drift_coeffs_factory[3];
+	/** Equilibrium Coarse value for factory_settings */
+	int32_t coarse_equilibrium_factory;
+	/** Indicate wether calibration parameters are valid */
+	bool calibration_valid;
+	int8_t pad_0[4];
 };
 
 /**
@@ -116,8 +108,12 @@ struct algorithm_state {
 	uint32_t ctrl_range_coarse[2];
 	/** Range of possible fine values applicable to the oscillator */
 	uint16_t ctrl_range_fine[2];
+	/** Number of ctrl_points */
+	int ctrl_points_length;
 	/** Fine values for which a drift coefficient is computed */
-	uint16_t *ctrl_points;
+	float *ctrl_points;
+	/** Ctrl drift coeffs */
+	float *ctrl_drift_coeffs;
 	/** Median value of the fine range */
 	uint16_t fine_mid;
 	/** Fine control value computed by the algorithm */
@@ -127,7 +123,7 @@ struct algorithm_state {
 	/** Exponential Smooth of the estimated equilibrium */
 	uint32_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
-	double estimated_drift;
+	float estimated_drift;
 	/** Kalman filter paramters */
 	struct kalman_parameters kalman;
 };

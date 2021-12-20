@@ -50,7 +50,7 @@ struct linear_func_param {
  * @param func_params Output structure of the linear regression
  * @return 0 in case of success, else errno
  */
-int simple_linear_reg(double x[], double y[], int length, struct linear_func_param * func_params);
+int simple_linear_reg(float x[], float y[], int length, struct linear_func_param * func_params);
 /**
  * @brief Linear interpolation
  * @param x Array of values corresponding to the abscissa
@@ -62,7 +62,7 @@ int simple_linear_reg(double x[], double y[], int length, struct linear_func_par
  * @return 0 in case of success, else errno
  */
 
-int lin_interp(double x[], double y[], int length, bool x_interp, double interp_value, double *interp_result);
+int lin_interp(float x[], float y[], int length, bool x_interp, float interp_value, float *interp_result);
 
 void file_cleanup(FILE **f);
 void string_cleanup(char **s);
