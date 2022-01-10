@@ -3,6 +3,12 @@ find_package(PkgConfig)
 
 set(PROJECT_NAME "oscillator-disciplining")
 
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_CLANG_TIDY
+    clang-tidy;
+    -header-filter=.;
+    -checks=*;)
+
 set(BUILD_DOC off)
 
 file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/version PACKAGE_VERSION)
