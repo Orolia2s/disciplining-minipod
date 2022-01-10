@@ -376,7 +376,7 @@ int od_process(struct od *od, const struct od_input *input,
 				else
 					x = phase;
 
-				if (abs(x) < params->ref_fluctuations_ns
+				if (fabs(x) < params->ref_fluctuations_ns
 					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
 				{
@@ -587,17 +587,31 @@ static int update_config(struct od *od)
 
 	// Clear EEPROM memory to clean everything that was inside
 	char* zeros = calloc(1, 1024);
-	write(eeprom, zeros, 1024);
+	ret = write(eeprom, zeros, 1024);
 	free(zeros);
 	close (eeprom);
+	if (ret != 1024) {
+		log_error("Could not clear data on EEPROM");
+		return -EINVAL;
+	}
 	eeprom = open(eeprom_path, O_WRONLY);
 	if (eeprom <= 0) {
 		log_error("Could not open file %s", eeprom_path);
 		return -EINVAL;
 	}
 
-	write(eeprom, data, strlen(data)+1);
-	write(eeprom, "\n", 1);
+	ret = write(eeprom, data, strlen(data)+1);
+	if (ret != (int) strlen(data) + 1) {
+		log_error("Could not write data to EEPROM");
+		close(eeprom);
+		return -EINVAL;
+	}
+	ret = write(eeprom, "\n", 1);
+	if (ret != 1) {
+		log_error("Could not write newline to EEPROM");
+		close(eeprom);
+		return -EINVAL;
+	}
 	close(eeprom);
 
 	return 0;
