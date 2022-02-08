@@ -27,53 +27,6 @@
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
 /**
- * Maximum number of points that can be stored in the memory of the card
- */
-#define CALIBRATION_POINTS_MAX 10
-
-/**
- * @struct disciplining parameters
- * @brief Disciplining parameters corresponding to mRO50 device disciplined
- *
- */
-struct disciplining_parameters {
-	/** Number of control nodes in ctrl_load_nodes */
-	uint8_t ctrl_nodes_length;
-	/**
-	 * Array containing the control node, in percentage
-	 * value of the control range.
-	 * Array contains ctrl_nodes_length valid values.
-	 */
-	float ctrl_load_nodes[CALIBRATION_POINTS_MAX];
-	/**
-	 * Array of drift coefficients for each control node.
-	 * Array contains ctrl_nodes_length valid values.
-	 */
-	float ctrl_drift_coeffs[CALIBRATION_POINTS_MAX];
-	/** Equilibrium Coarse value define during calibration */
-	int32_t coarse_equilibrium;
-	/** Factory Settings that can be used with any mRO50 */
-	/** Number of control nodes in ctrl_load_nodes_factory */
-	uint8_t ctrl_nodes_length_factory;
-	/**
-	 * Array containing the control node, in percentage
-	 * value of the control range.
-	 * Array contains ctrl_nodes_length_factory valid values.
-	 */
-	float ctrl_load_nodes_factory[3];
-	/**
-	 * Array of drift coefficients for each control node.
-	 * Array contains ctrl_nodes_length_factory valid values.
-	 */
-	float ctrl_drift_coeffs_factory[3];
-	/** Equilibrium Coarse value for factory_settings */
-	int32_t coarse_equilibrium_factory;
-	/** Indicate wether calibration parameters are valid */
-	bool calibration_valid;
-	int8_t pad_0[4];
-};
-
-/**
  * @struct kalman_parameters
  * @brief Kalman filter parameters
  */

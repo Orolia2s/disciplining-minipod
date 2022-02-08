@@ -71,7 +71,6 @@ struct od {
 	struct algorithm_state state;
 	/** Algorithm parameters */
 	struct minipod_config minipod_config;
-	char * disciplining_parameters_path;
 	struct disciplining_parameters dsc_parameters;
 };
 
@@ -195,12 +194,6 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		log_info("Estimated equilibrium is in tolerance range, saving calibration in config file");
 		dsc_parameters->coarse_equilibrium = input->coarse_setpoint;
 		dsc_parameters->calibration_valid = true;
-		/* Save new drift coeffs in config file */
-		int ret = update_disciplining_parameters(&od->dsc_parameters, od->disciplining_parameters_path);
-		if (ret < 0) {
-			log_error("Error updating configuration with new drift coefficients ! Calibration must be done again next time");
-		}
-
 		return true;
 	} else if (state->calib) {
 		log_info("Coarse alignment must be adjusted based on calibration");
@@ -263,16 +256,10 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 	return kalman->Kphase;
 }
 
-struct od *od_new_from_config(const char *path, struct minipod_config *minipod_config, char err_msg[OD_ERR_MSG_LEN])
+struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
 	int ret;
-	int path_size;
-
-	if (path == NULL || *path == '\0' || err_msg == NULL) {
-		errno = EINVAL;
-		return NULL;
-	}
 
 	od = calloc(1, sizeof(struct od));
 	if (od == NULL)
@@ -286,15 +273,9 @@ struct od *od_new_from_config(const char *path, struct minipod_config *minipod_c
 		LOG_INFO
 	);
 	print_minipod_config(&od->minipod_config);
-	path_size = strlen(path) + 1;
-	od->disciplining_parameters_path = malloc(path_size * sizeof(char));
-	strncpy(od->disciplining_parameters_path, path, path_size);
 
-	ret = get_disciplining_parameters(&od->dsc_parameters, od->disciplining_parameters_path);
-	if (ret != 0) {
-		log_error("Error reading discipling parameters");
-		return NULL;
-	}
+	memcpy(&od->dsc_parameters, disciplining_config, sizeof(struct disciplining_parameters));
+
 	print_disciplining_parameters(&od->dsc_parameters);
 
 	ret = init_algorithm_state(od);
@@ -360,7 +341,7 @@ int od_process(struct od *od, const struct od_input *input,
 			state->status = INIT;
 
 			/* Request coarse value to be saved in mRO50 memory */
-			output->action = SAVE_COARSE;
+			output->action = SAVE_DISCIPLINING_PARAMETERS;
 			return 0;
 		}
 
@@ -512,6 +493,20 @@ int od_process(struct od *od, const struct od_input *input,
 		output->setpoint = state->estimated_equilibrium_ES;
 	}
 	return 0;
+}
+
+struct disciplining_parameters * od_get_disciplining_parameters(struct od *od) {
+	if (od == NULL) {
+		log_error("Library context is null");
+		return NULL;
+	}
+	struct disciplining_parameters *param_extract = malloc(sizeof(struct disciplining_parameters));
+	if (param_extract == NULL) {
+		log_error("Cannot allocate memory to copy disciplining parameters");
+		return NULL;
+	}
+	memcpy(param_extract, &od->dsc_parameters, sizeof(struct disciplining_parameters));
+	return param_extract;
 }
 
 struct calibration_parameters * od_get_calibration_parameters(struct od *od)
@@ -671,8 +666,6 @@ void od_destroy(struct od **od)
 {
 	if (od == NULL || *od == NULL)
 		return;
-	free((*od)->disciplining_parameters_path);
-	(*od)->disciplining_parameters_path = NULL;
 	free((*od)->state.ctrl_points);
 	(*od)->state.ctrl_points = NULL;
 	free((*od)->state.ctrl_drift_coeffs);

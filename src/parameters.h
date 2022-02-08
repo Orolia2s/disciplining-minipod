@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 
+#include <oscillator-disciplining/oscillator-disciplining.h>
 #include "algorithm_structs.h"
 #include "log.h"
 
