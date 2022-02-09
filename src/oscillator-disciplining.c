@@ -495,18 +495,13 @@ int od_process(struct od *od, const struct od_input *input,
 	return 0;
 }
 
-struct disciplining_parameters * od_get_disciplining_parameters(struct od *od) {
+int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters* disciplining_parameters) {
 	if (od == NULL) {
 		log_error("Library context is null");
-		return NULL;
+		return -1;
 	}
-	struct disciplining_parameters *param_extract = malloc(sizeof(struct disciplining_parameters));
-	if (param_extract == NULL) {
-		log_error("Cannot allocate memory to copy disciplining parameters");
-		return NULL;
-	}
-	memcpy(param_extract, &od->dsc_parameters, sizeof(struct disciplining_parameters));
-	return param_extract;
+	memcpy(disciplining_parameters, &od->dsc_parameters, sizeof(struct disciplining_parameters));
+	return 0;
 }
 
 struct calibration_parameters * od_get_calibration_parameters(struct od *od)

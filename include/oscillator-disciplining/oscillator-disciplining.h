@@ -279,9 +279,10 @@ int od_process(struct od *od, const struct od_input *input,
 /**
  * @brief Output disciplining parameters used by minipod.
  * @param od Library context.
- * @return struct disciplining_parameters.
+ * @param disciplining_parameters pointer to output disciplining parameters.
+ * @return int, 0 on success.
  */
-struct disciplining_parameters * od_get_disciplining_parameters(struct od *od);
+int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters *disciplining_parameters);
 
 /**
  * @brief Outputs parameters needed for the mRO50 calibration.
