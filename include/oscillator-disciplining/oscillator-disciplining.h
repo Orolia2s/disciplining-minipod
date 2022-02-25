@@ -103,8 +103,6 @@ struct minipod_config {
  *
  */
 struct disciplining_parameters {
-	/** Number of control nodes in ctrl_load_nodes */
-	uint8_t ctrl_nodes_length;
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -117,10 +115,6 @@ struct disciplining_parameters {
 	 */
 	float ctrl_drift_coeffs[CALIBRATION_POINTS_MAX];
 	/** Equilibrium Coarse value define during calibration */
-	int32_t coarse_equilibrium;
-	/** Factory Settings that can be used with any mRO50 */
-	/** Number of control nodes in ctrl_load_nodes_factory */
-	uint8_t ctrl_nodes_length_factory;
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -134,11 +128,17 @@ struct disciplining_parameters {
 	float ctrl_drift_coeffs_factory[3];
 	/** Equilibrium Coarse value for factory_settings */
 	int32_t coarse_equilibrium_factory;
+	int32_t coarse_equilibrium;
+	/** Date at which calibration has been made */
+	time_t calibration_date;
+	/** Factory Settings that can be used with any mRO50 */
+	/** Number of control nodes in ctrl_load_nodes_factory */
+	uint8_t ctrl_nodes_length_factory;
+	/** Number of control nodes in ctrl_load_nodes */
+	uint8_t ctrl_nodes_length;
 	/** Indicate wether calibration parameters are valid */
 	bool calibration_valid;
-	int8_t pad_0[4];
 };
-
 
 /**
  * @struct od_input
