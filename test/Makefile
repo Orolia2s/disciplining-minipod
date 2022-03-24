@@ -10,8 +10,13 @@ OBJS= test-utils.o utils.o log.o
 EXE2 = test-minipod-lib
 OBJS2 = test-minipod-lib.o
 
+all: test-minipod test-utils-test
+
 test-minipod: test-minipod-lib
 	LD_LIBRARY_PATH=/usr/local/lib ./test-minipod-lib
+
+test-utils-test: $(EXE)
+	./test-utils
 
 $(EXE): $(OBJS)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
