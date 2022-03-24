@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include "compare_floats.h"
+
 int main() {
     int ret;
 
@@ -30,8 +32,8 @@ int main() {
 
     printf("Testing simple linear reg\n");
     /* Test 1 */
-    double x1[4] = { 1.0, 2.0, 4.0, 8.0 };
-    double y1[4] = { 30.0, 50.0, 90.0, 170.0 };
+    float x1[4] = { 1.0, 2.0, 4.0, 8.0 };
+    float y1[4] = { 30.0, 50.0, 90.0, 170.0 };
 
     struct linear_func_param test_result;
 
@@ -48,45 +50,45 @@ int main() {
     }
 
     printf("Testing lin_interp\n");
-    double x2[5] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
-    double y2[5] = { 10.0, 8.0, 12.0, 10.0, 9.0};
-    double result;
+    float x2[5] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
+    float y2[5] = { 10.0, 8.0, 12.0, 10.0, 9.0};
+    float result;
 
     /* X interpolation */
     ret = lin_interp(x2, y2, 5, true, 1.5, &result);
     assert(ret == 0);
-    assert(result == 9.0);
+    assert(compare_float(result, 9.0) == 1);
 
     ret = lin_interp(x2, y2, 5, true, 2.5, &result);
     assert(ret == 0);
-    assert(result == 10.0);
+    assert(compare_float(result, 10.) == 1);
 
     ret = lin_interp(x2, y2, 5, true, 3.5, &result);
     assert(ret == 0);
-    assert(result == 11.0);
+    assert(compare_float(result, 11.) == 1);
 
     ret = lin_interp(x2, y2, 5, true, 4.5, &result);
     assert(ret == 0);
-    assert(result == 9.5);
+    assert(compare_float(result, 9.5) == 1);
 
     /* Y interpolation */
-    double x3[5] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
-    double y3[5] = { 10.0, 15.0, 25.0, 50.0, 100.0};
+    float x3[5] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
+    float y3[5] = { 10.0, 15.0, 25.0, 50.0, 100.0};
 
     ret = lin_interp(x3, y3, 5, false, 12.5, &result);
     assert(ret == 0);
-    assert(result == 1.5);
+    assert(compare_float(result, 1.5) == 1);
 
     ret = lin_interp(x3, y3, 5, false, 75.0, &result);
     assert(ret == 0);
-    assert(result == 4.5);
+    assert(compare_float(result, 4.5) == 1);
 
     ret = lin_interp(x3, y3, 5, false, 150.0, &result);
     assert(ret == 0);
-    assert(result == 6.0);
+    assert(compare_float(result, 6.0) == 1);
 
     ret = lin_interp(x3, y3, 5, false, 7.5, &result);
     assert(ret == 0);
-    assert(result == 0.5);
+    assert(compare_float(result, 0.5) == 1);
     printf("Test passed\n");
 }
