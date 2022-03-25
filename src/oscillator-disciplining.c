@@ -602,10 +602,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	{
 		float v[calib_params->nb_calibration];
 		for(int j = 0; j < calib_params->nb_calibration; j++)
-		{
-			struct timespec * current_measure = calib_results->measures + i * calib_params->nb_calibration + j;
-			v[j] = (float) current_measure->tv_nsec;
-		}
+			v[j] = *(calib_results->measures + i * calib_params->nb_calibration + j);
 
 		struct linear_func_param func_params;
 
