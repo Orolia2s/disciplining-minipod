@@ -244,7 +244,7 @@ struct calibration_results {
 	 * calib_results can be represented as
 	 * a double array of size length * nb_calibration
 	*/
-	struct timespec * measures;
+	float *measures;
 	/** Number of control points.
 	 * Should be equal to calibration_parameters.length
 	 */
