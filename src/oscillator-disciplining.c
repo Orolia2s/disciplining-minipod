@@ -60,7 +60,7 @@
 /** Smooth exponential factor for estimated equilibrium
  * used during holdover phase
  */
-#define ALPHA_ES 0.05
+#define ALPHA_ES 0.01
 
 /**
  * @struct od
