@@ -54,9 +54,13 @@
 /** Maximum possible value of coarse control */
 #define COARSE_RANGE_MAX 4194303
 /** Minimum possible value of fine control */
-#define FINE_RANGE_MIN 1600
+#define FINE_RANGE_MIN 0
 /** Maximum possible value of fine control */
-#define FINE_RANGE_MAX 3200
+#define FINE_RANGE_MAX 4800
+/** Minimum possible value of fine control used for calibration*/
+#define FINE_MID_RANGE_MIN 1600
+/** Maximum possible value of fine control used for calibration*/
+#define FINE_MID_RANGE_MAX 3200
 /** Smooth exponential factor for estimated equilibrium
  * used during holdover phase
  */
@@ -120,9 +124,9 @@ static int init_algorithm_state(struct od * od) {
 	state->status = INIT;
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
 	state->ctrl_range_coarse[1] = COARSE_RANGE_MAX;
-	state->ctrl_range_fine[0] = FINE_RANGE_MIN;
-	state->ctrl_range_fine[1] = FINE_RANGE_MAX;
-	state->fine_mid = (uint16_t) (0.5 * (FINE_RANGE_MIN + FINE_RANGE_MAX));
+	state->ctrl_range_fine[0] = FINE_MID_RANGE_MIN;
+	state->ctrl_range_fine[1] = FINE_MID_RANGE_MAX;
+	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
 	state->estimated_drift = 0;
 	state->fine_ctrl_value = 0;
 
@@ -440,11 +444,16 @@ int od_process(struct od *od, const struct od_input *input,
 					log_error("Error occured in lin_interp: %d", ret);
 					return -1;
 				}
+				/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
+				if (interp_value <= 0.0) {
+					log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
+					interp_value = 0.0;
+				}
 
 				state->fine_ctrl_value = (uint16_t) round(interp_value);
 
-				if (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
+				if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+					&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
 				{
 					state->estimated_drift = react_coeff;
 					output->action = ADJUST_FINE;
@@ -457,10 +466,10 @@ int od_process(struct od *od, const struct od_input *input,
 
 					float stop_value;
 
-					if (state->fine_ctrl_value < state->ctrl_range_fine[0])
-						stop_value = state->ctrl_range_fine[0];
+					if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
+						stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
 					else
-						stop_value = state->ctrl_range_fine[1];
+						stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
 
 					ret = lin_interp(
 						state->ctrl_points,
