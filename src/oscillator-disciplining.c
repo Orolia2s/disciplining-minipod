@@ -61,14 +61,21 @@
 #define FINE_MID_RANGE_MIN 1600
 /** Maximum possible value of fine control used for calibration*/
 #define FINE_MID_RANGE_MAX 3200
-/** Smooth exponential factor for estimated equilibrium
+/**
+ * Smooth exponential factor for estimated equilibrium
  * used during holdover phase
  */
 #define ALPHA_ES 0.01
+/**
+ * Maximum drift coefficient
+ * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
+ */
+#define DRIFT_COEFFICIENT_ABSOLUTE_MAX 7.2
 
 #define PS_IN_NS 1000
 
 #define PS_IN_NS 1000
+
 
 /**
  * @struct od
@@ -194,12 +201,36 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 	struct algorithm_state *state = &(od->state);
 	struct minipod_config *config = &(od->minipod_config);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
+	int i;
+
 	log_debug("Control Check mRO:");
+	/* Check estimated equilibrium is in tolerance range */
 	if (state->calib
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + config->fine_stop_tolerance
 		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - config->fine_stop_tolerance
+		&& state->ctrl_drift_coeffs[0] >= 0.0 && state->ctrl_drift_coeffs[state->ctrl_points_length - 1] <= 0.0
 	) {
 		log_info("Estimated equilibrium is in tolerance range, saving calibration in config file");
+		for(i = 0; i < state->ctrl_points_length - 2; i++) {
+			if (state->ctrl_drift_coeffs[i] < state->ctrl_drift_coeffs[i+1]) {
+				log_debug("ctrl_drift_coeffs[%d] = %f is greater than ctrl_drift_coeffs[%d] = %f",
+					i, state->ctrl_drift_coeffs[i], i + 1, state->ctrl_drift_coeffs[i+1]);
+				log_warn("Calibration coefficients are not descending with fine values");
+				output->action = CALIBRATE;
+				return false;
+			}
+		}
+		log_debug("Calibration coefficients are descending with fine values");
+		for(i = 0; i < state->ctrl_points_length; i++) {
+			if (fabs(state->ctrl_drift_coeffs[i]) > DRIFT_COEFFICIENT_ABSOLUTE_MAX) {
+				log_warn("ctrl_drift_coeffs[%d] coefficient is greater than %f in absolute: %f",
+					i, DRIFT_COEFFICIENT_ABSOLUTE_MAX, state->ctrl_drift_coeffs[i]);
+				output->action = CALIBRATE;
+				return false;
+			}
+		}
+		log_debug("All coefficients are inferior to %f in absolute value", DRIFT_COEFFICIENT_ABSOLUTE_MAX);
+
 		dsc_parameters->coarse_equilibrium = input->coarse_setpoint;
 		dsc_parameters->calibration_valid = true;
 		return true;
