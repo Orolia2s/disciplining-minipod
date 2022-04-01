@@ -267,13 +267,13 @@ static void print_inputs(struct od_input inputs[7])
 {
 	log_info(
 		"Inputs: [%ld, %ld, %ld, %ld, %ld, %ld, %ld]",
-		inputs[0].phase_error.tv_nsec,
-		inputs[1].phase_error.tv_nsec,
-		inputs[2].phase_error.tv_nsec,
-		inputs[3].phase_error.tv_nsec,
-		inputs[4].phase_error.tv_nsec,
-		inputs[5].phase_error.tv_nsec,
-		inputs[6].phase_error.tv_nsec
+		inputs[0].phase_error.tv_nsec+ (float) inputs[0].qErr / PS_IN_NS,
+		inputs[1].phase_error.tv_nsec+ (float) inputs[1].qErr / PS_IN_NS,
+		inputs[2].phase_error.tv_nsec+ (float) inputs[2].qErr / PS_IN_NS,
+		inputs[3].phase_error.tv_nsec+ (float) inputs[3].qErr / PS_IN_NS,
+		inputs[4].phase_error.tv_nsec+ (float) inputs[4].qErr / PS_IN_NS,
+		inputs[5].phase_error.tv_nsec+ (float) inputs[5].qErr / PS_IN_NS,
+		inputs[6].phase_error.tv_nsec+ (float) inputs[6].qErr / PS_IN_NS
 	);
 }
 
