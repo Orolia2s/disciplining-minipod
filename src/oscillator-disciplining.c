@@ -138,6 +138,7 @@ static int init_algorithm_state(struct od * od) {
 	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
 	state->estimated_drift = 0;
 	state->fine_ctrl_value = 0;
+	state->od_process_count = 0;
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = config->ref_fluctuations_ns;
@@ -295,6 +296,20 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 	return kalman->Kphase;
 }
 
+static void print_inputs(struct od_input inputs[7])
+{
+	log_info(
+		"Inputs: [%f, %f, %f, %f, %f, %f, %f]",
+		(float) inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS,
+		(float) inputs[1].phase_error.tv_nsec + (float) inputs[1].qErr / PS_IN_NS,
+		(float) inputs[2].phase_error.tv_nsec + (float) inputs[2].qErr / PS_IN_NS,
+		(float) inputs[3].phase_error.tv_nsec + (float) inputs[3].qErr / PS_IN_NS,
+		(float) inputs[4].phase_error.tv_nsec + (float) inputs[4].qErr / PS_IN_NS,
+		(float) inputs[5].phase_error.tv_nsec + (float) inputs[5].qErr / PS_IN_NS,
+		(float) inputs[6].phase_error.tv_nsec + (float) inputs[6].qErr / PS_IN_NS
+	);
+}
+
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
@@ -343,200 +358,212 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
+	output->action = NO_OP;
+
 	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
 		od->state.status, input->valid, input->lock);
+	memcpy(&(state->inputs[state->od_process_count]), input, sizeof(struct od_input));
+	//print_inputs(state->inputs);
 
-	if (input->valid && input->lock)
-	{
-		if (od->state.status != CALIBRATION
-			&& (
-				config->calibrate_first
-				|| input->calibration_requested
+	if (state->od_process_count == 6) {
+		state->od_process_count = 0;
+                print_inputs(state->inputs);
+
+		if (input->valid && input->lock)
+		{
+			if (od->state.status != CALIBRATION
+				&& (
+					config->calibrate_first
+					|| input->calibration_requested
+				)
 			)
-		)
-		{
-			config->calibrate_first = false;
-			output->action = CALIBRATE;
-			od->state.status = CALIBRATION;
-			return 0;
-		}
-		/** Invalid control value, need to check mRO control values
-		 * If calibration has been done, we need to make a control check of the mRO
-		 */
-		if (state->invalid_ctrl || state->status == CALIBRATION)
-		{
-			if(!control_check_mRO(od, input, output))
 			{
-				/* Control check has not been passed.
-				* Either a Coarse alignement or a calibration process
-				* has been decided and prepared in output
-				*/
-				state->calib = false;
-				log_debug("Control_check_mro has not been passed !");
+				config->calibrate_first = false;
+				output->action = CALIBRATE;
+				od->state.status = CALIBRATION;
 				return 0;
 			}
-			log_debug("Control check mRO has been passed !");
-			state->calib = false;
-			state->status = INIT;
+			/** Invalid control value, need to check mRO control values
+			 * If calibration has been done, we need to make a control check of the mRO
+			 */
+			if (state->invalid_ctrl || state->status == CALIBRATION)
+			{
+				if(!control_check_mRO(od, input, output))
+				{
+					/* Control check has not been passed.
+					* Either a Coarse alignement or a calibration process
+					* has been decided and prepared in output
+					*/
+					state->calib = false;
+					log_debug("Control_check_mro has not been passed !");
+					return 0;
+				}
+				log_debug("Control check mRO has been passed !");
+				state->calib = false;
+				state->status = INIT;
 
-			/* Request coarse value to be saved in mRO50 memory */
-			output->action = SAVE_DISCIPLINING_PARAMETERS;
-			return 0;
-		}
+				/* Request coarse value to be saved in mRO50 memory */
+				output->action = SAVE_DISCIPLINING_PARAMETERS;
+				return 0;
+			}
 
-		/* Initialization */
-		if (state->status == INIT)
-		{
-			if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium_factory;
-				log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium;
-				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else {
-				if (dsc_parameters->coarse_equilibrium < 0)
-					log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
-						"consider calibration if disciplining is not efficient");
+			/* Initialization */
+			if (state->status == INIT)
+			{
+				if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
+					output->action = ADJUST_COARSE;
+					output->setpoint = dsc_parameters->coarse_equilibrium_factory;
+					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
+					output->action = ADJUST_COARSE;
+					output->setpoint = dsc_parameters->coarse_equilibrium;
+					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else {
+					if (dsc_parameters->coarse_equilibrium < 0)
+						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
+							"consider calibration if disciplining is not efficient");
+					output->action = ADJUST_FINE;
+					output->setpoint = state->estimated_equilibrium;
+					state->status = PHASE_ADJUSTMENT;
+					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
+
+				}
+				return 0;
+			}
+			/* Holdover and valid flag switched to valid,
+			* We wait for one cycle to start disciplining again
+			*/
+			else if (state->status == HOLDOVER)
+			{
+				state->status = PHASE_ADJUSTMENT;
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
-				state->status = PHASE_ADJUSTMENT;
-				log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
-
+				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 			}
-			return 0;
-		}
-		/* Holdover and valid flag switched to valid,
-		 * We wait for one cycle to start disciplining again
-		 */
-		else if (state->status == HOLDOVER)
-		{
-			state->status = PHASE_ADJUSTMENT;
-			output->action = ADJUST_FINE;
-			output->setpoint = state->estimated_equilibrium;
-			log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
-		}
-		else
-		{
-			if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
+			else
 			{
-				/* Call Main loop */
-				log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
-				float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
-				log_debug("Phase filtered with qErr: %f", phase);
-				float filtered_phase = filter_phase(
-					&(state->kalman),
-					phase,
-					SETTLING_TIME,
-					state->estimated_drift
-				);
-				float innovation = phase - filtered_phase;
-				log_info("Filtered phase is %f", filtered_phase);
-
-				float x;
-				if (fabs(phase) <= config->ref_fluctuations_ns
-					&& fabs(innovation) <= config->ref_fluctuations_ns)
-					x = filtered_phase;
-				else
-					x = phase;
-
-				if (fabs(x) < config->ref_fluctuations_ns
-					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+				if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
 				{
-					state->estimated_equilibrium_ES =
-						round((ALPHA_ES * state->fine_ctrl_value
-						+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
-					log_info("Estimated equilibrium with exponential smooth is %d",
-						state->estimated_equilibrium_ES);
-				}
+					/* Call Main loop */
+					log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
+					float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
+					log_debug("Phase filtered with qErr: %f", phase);
+					float filtered_phase = filter_phase(
+						&(state->kalman),
+						phase,
+						SETTLING_TIME,
+						state->estimated_drift
+					);
+					float innovation = phase - filtered_phase;
+					log_info("Filtered phase is %f", filtered_phase);
 
-				float r = get_reactivity(
-					fabs(x),
-					config->ref_fluctuations_ns,
-					config->reactivity_min,
-					config->reactivity_max,
-					config->reactivity_power
-				);
-				float react_coeff = - x / r;
-				log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
-
-				float interp_value;
-
-				ret = lin_interp(
-					state->ctrl_points,
-					state->ctrl_drift_coeffs,
-					state->ctrl_points_length,
-					Y_INTERPOLATION,
-					react_coeff,
-					&interp_value
-				);
-				if (ret < 0)
-				{
-					log_error("Error occured in lin_interp: %d", ret);
-					return -1;
-				}
-				/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
-				if (interp_value <= 0.0) {
-					log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
-					interp_value = 0.0;
-				}
-
-				state->fine_ctrl_value = (uint16_t) round(interp_value);
-
-				if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
-					&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
-				{
-					state->estimated_drift = react_coeff;
-					output->action = ADJUST_FINE;
-					output->setpoint = state->fine_ctrl_value;
-				}
-				else
-				{
-					log_warn("Control value is out of range, if convergence is not reached"
-						" consider recalibration or other reactivity parameters");
-
-					float stop_value;
-
-					if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
-						stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
+					float x;
+					if (fabs(phase) <= config->ref_fluctuations_ns
+						&& fabs(innovation) <= config->ref_fluctuations_ns)
+						x = filtered_phase;
 					else
-						stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
+						x = phase;
+
+					if (fabs(x) < config->ref_fluctuations_ns
+						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
+						&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+					{
+						state->estimated_equilibrium_ES =
+							round((ALPHA_ES * state->fine_ctrl_value
+							+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
+						log_info("Estimated equilibrium with exponential smooth is %d",
+							state->estimated_equilibrium_ES);
+					}
+
+					float r = get_reactivity(
+						fabs(x),
+						config->ref_fluctuations_ns,
+						config->reactivity_min,
+						config->reactivity_max,
+						config->reactivity_power
+					);
+					float react_coeff = - x / r;
+					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
+
+					float interp_value;
 
 					ret = lin_interp(
 						state->ctrl_points,
 						state->ctrl_drift_coeffs,
 						state->ctrl_points_length,
-						X_INTERPOLATION,
-						stop_value,
-						&state->estimated_drift
+						Y_INTERPOLATION,
+						react_coeff,
+						&interp_value
 					);
-					log_info("Estimated drift is now %f", state->estimated_drift);
-
 					if (ret < 0)
 					{
 						log_error("Error occured in lin_interp: %d", ret);
 						return -1;
 					}
+					/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
+					if (interp_value <= 0.0) {
+						log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
+						interp_value = 0.0;
+					}
 
-					output->action = ADJUST_FINE;
-					output->setpoint = stop_value;
+					state->fine_ctrl_value = (uint16_t) round(interp_value);
+
+					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
+					{
+						state->estimated_drift = react_coeff;
+						output->action = ADJUST_FINE;
+						output->setpoint = state->fine_ctrl_value;
+					}
+					else
+					{
+						log_warn("Control value is out of range, if convergence is not reached"
+							" consider recalibration or other reactivity parameters");
+
+						float stop_value;
+
+						if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
+							stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
+						else
+							stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
+
+						ret = lin_interp(
+							state->ctrl_points,
+							state->ctrl_drift_coeffs,
+							state->ctrl_points_length,
+							X_INTERPOLATION,
+							stop_value,
+							&state->estimated_drift
+						);
+						log_info("Estimated drift is now %f", state->estimated_drift);
+
+						if (ret < 0)
+						{
+							log_error("Error occured in lin_interp: %d", ret);
+							return -1;
+						}
+
+						output->action = ADJUST_FINE;
+						output->setpoint = stop_value;
+					}
+					return 0;
+				} else {
+					/* Phase jump needed */
+					output->action = PHASE_JUMP;
+					output->value_phase_ctrl = input->phase_error.tv_nsec;
+					return 0;
 				}
-				return 0;
-			} else {
-				/* Phase jump needed */
-				output->action = PHASE_JUMP;
-				output->value_phase_ctrl = input->phase_error.tv_nsec;
-				return 0;
 			}
+		} else {
+			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+			log_info("Applying estimated equilibirum until going out of holdover");
+			state->status = HOLDOVER;
+			output->action = ADJUST_FINE;
+			output->setpoint = state->estimated_equilibrium_ES;
 		}
 	} else {
-		log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-		log_info("Applying estimated equilibirum until going out of holdover");
-		state->status = HOLDOVER;
-		output->action = ADJUST_FINE;
-		output->setpoint = state->estimated_equilibrium_ES;
+		state->od_process_count++;
+		output->action = NO_OP;
 	}
 	return 0;
 }
