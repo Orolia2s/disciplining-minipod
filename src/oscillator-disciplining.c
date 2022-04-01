@@ -311,6 +311,8 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
+	output->action = NO_OP;
+
 	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
 		od->state.status, input->valid, input->lock);
 
@@ -502,6 +504,7 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 			} else {
 				state->od_process_count++;
+				output->action = NO_OP;
 			}
 		}
 	} else {
