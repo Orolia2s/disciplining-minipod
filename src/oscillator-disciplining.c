@@ -129,6 +129,7 @@ static int init_algorithm_state(struct od * od) {
 	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
 	state->estimated_drift = 0;
 	state->fine_ctrl_value = 0;
+	state->od_process_count = 0;
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = config->ref_fluctuations_ns;
@@ -386,116 +387,121 @@ int od_process(struct od *od, const struct od_input *input,
 		}
 		else
 		{
-			if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
-			{
-				/* Call Main loop */
-				log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
-				float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
-				log_debug("Phase filtered with qErr: %f", phase);
-				float filtered_phase = filter_phase(
-					&(state->kalman),
-					phase,
-					SETTLING_TIME,
-					state->estimated_drift
-				);
-				float innovation = phase - filtered_phase;
-				log_info("Filtered phase is %f", filtered_phase);
-
-				float x;
-				if (fabs(phase) <= config->ref_fluctuations_ns
-					&& fabs(innovation) <= config->ref_fluctuations_ns)
-					x = filtered_phase;
-				else
-					x = phase;
-
-				if (fabs(x) < config->ref_fluctuations_ns
-					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+			if (state->od_process_count == 5) {
+				state->od_process_count = 0;
+				if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
 				{
-					state->estimated_equilibrium_ES =
-						round((ALPHA_ES * state->fine_ctrl_value
-						+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
-					log_info("Estimated equilibrium with exponential smooth is %d",
-						state->estimated_equilibrium_ES);
-				}
+					/* Call Main loop */
+					log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
+					float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
+					log_debug("Phase filtered with qErr: %f", phase);
+					float filtered_phase = filter_phase(
+						&(state->kalman),
+						phase,
+						SETTLING_TIME,
+						state->estimated_drift
+					);
+					float innovation = phase - filtered_phase;
+					log_info("Filtered phase is %f", filtered_phase);
 
-				float r = get_reactivity(
-					fabs(x),
-					config->ref_fluctuations_ns,
-					config->reactivity_min,
-					config->reactivity_max,
-					config->reactivity_power
-				);
-				float react_coeff = - x / r;
-				log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
-
-				float interp_value;
-
-				ret = lin_interp(
-					state->ctrl_points,
-					state->ctrl_drift_coeffs,
-					state->ctrl_points_length,
-					Y_INTERPOLATION,
-					react_coeff,
-					&interp_value
-				);
-				if (ret < 0)
-				{
-					log_error("Error occured in lin_interp: %d", ret);
-					return -1;
-				}
-				/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
-				if (interp_value <= 0.0) {
-					log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
-					interp_value = 0.0;
-				}
-
-				state->fine_ctrl_value = (uint16_t) round(interp_value);
-
-				if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
-					&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
-				{
-					state->estimated_drift = react_coeff;
-					output->action = ADJUST_FINE;
-					output->setpoint = state->fine_ctrl_value;
-				}
-				else
-				{
-					log_warn("Control value is out of range, if convergence is not reached"
-						" consider recalibration or other reactivity parameters");
-
-					float stop_value;
-
-					if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
-						stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
+					float x;
+					if (fabs(phase) <= config->ref_fluctuations_ns
+						&& fabs(innovation) <= config->ref_fluctuations_ns)
+						x = filtered_phase;
 					else
-						stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
+						x = phase;
+
+					if (fabs(x) < config->ref_fluctuations_ns
+						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
+						&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+					{
+						state->estimated_equilibrium_ES =
+							round((ALPHA_ES * state->fine_ctrl_value
+							+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
+						log_info("Estimated equilibrium with exponential smooth is %d",
+							state->estimated_equilibrium_ES);
+					}
+
+					float r = get_reactivity(
+						fabs(x),
+						config->ref_fluctuations_ns,
+						config->reactivity_min,
+						config->reactivity_max,
+						config->reactivity_power
+					);
+					float react_coeff = - x / r;
+					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
+
+					float interp_value;
 
 					ret = lin_interp(
 						state->ctrl_points,
 						state->ctrl_drift_coeffs,
 						state->ctrl_points_length,
-						X_INTERPOLATION,
-						stop_value,
-						&state->estimated_drift
+						Y_INTERPOLATION,
+						react_coeff,
+						&interp_value
 					);
-					log_info("Estimated drift is now %f", state->estimated_drift);
-
 					if (ret < 0)
 					{
 						log_error("Error occured in lin_interp: %d", ret);
 						return -1;
 					}
+					/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
+					if (interp_value <= 0.0) {
+						log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
+						interp_value = 0.0;
+					}
 
-					output->action = ADJUST_FINE;
-					output->setpoint = stop_value;
+					state->fine_ctrl_value = (uint16_t) round(interp_value);
+
+					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
+					{
+						state->estimated_drift = react_coeff;
+						output->action = ADJUST_FINE;
+						output->setpoint = state->fine_ctrl_value;
+					}
+					else
+					{
+						log_warn("Control value is out of range, if convergence is not reached"
+							" consider recalibration or other reactivity parameters");
+
+						float stop_value;
+
+						if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
+							stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
+						else
+							stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
+
+						ret = lin_interp(
+							state->ctrl_points,
+							state->ctrl_drift_coeffs,
+							state->ctrl_points_length,
+							X_INTERPOLATION,
+							stop_value,
+							&state->estimated_drift
+						);
+						log_info("Estimated drift is now %f", state->estimated_drift);
+
+						if (ret < 0)
+						{
+							log_error("Error occured in lin_interp: %d", ret);
+							return -1;
+						}
+
+						output->action = ADJUST_FINE;
+						output->setpoint = stop_value;
+					}
+					return 0;
+				} else {
+					/* Phase jump needed */
+					output->action = PHASE_JUMP;
+					output->value_phase_ctrl = input->phase_error.tv_nsec;
+					return 0;
 				}
-				return 0;
 			} else {
-				/* Phase jump needed */
-				output->action = PHASE_JUMP;
-				output->value_phase_ctrl = input->phase_error.tv_nsec;
-				return 0;
+				state->od_process_count++;
 			}
 		}
 	} else {

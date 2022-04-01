@@ -79,6 +79,8 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Kalman filter paramters */
 	struct kalman_parameters kalman;
+	/** Counts how many times od_process has been called */
+	int od_process_count;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
