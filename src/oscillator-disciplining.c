@@ -265,21 +265,16 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 
 static void print_inputs(struct od_input inputs[7])
 {
-	char string_inputs[1024];
-	char string_tmp[100];
-	sprintf(string_inputs, "Inputs: [");
-	for (int i = 0; i < 7; i++) {
-		sprintf(string_tmp, "%ld", inputs[i].phase_error.tv_nsec);
-		strcat(string_inputs, string_tmp);
-		if (i != 6) {
-			sprintf(string_inputs, ", ");
-			strcat(string_inputs, string_tmp);
-		} else {
-			sprintf(string_inputs, "]");
-			strcat(string_inputs, string_tmp);
-		}
-	}
-	log_info(string_inputs);
+	log_info(
+		"Inputs: [%ld, %ld, %ld, %ld, %ld, %ld, %ld]",
+		inputs[0].phase_error.tv_nsec,
+		inputs[1].phase_error.tv_nsec,
+		inputs[2].phase_error.tv_nsec,
+		inputs[3].phase_error.tv_nsec,
+		inputs[4].phase_error.tv_nsec,
+		inputs[5].phase_error.tv_nsec,
+		inputs[6].phase_error.tv_nsec
+	);
 }
 
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
