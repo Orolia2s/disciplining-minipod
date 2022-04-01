@@ -330,9 +330,10 @@ int od_process(struct od *od, const struct od_input *input,
 	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
 		od->state.status, input->valid, input->lock);
 	memcpy(&(state->inputs[state->od_process_count]), input, sizeof(struct od_input));
+	print_inputs(state->inputs);
+
 	if (state->od_process_count == 6) {
 		state->od_process_count = 0;
-		print_inputs(state->inputs);
 
 		if (input->valid && input->lock)
 		{
