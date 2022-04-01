@@ -268,11 +268,11 @@ static void print_inputs(struct od_input inputs[7])
 	char string_inputs[2048];
 	sprintf(string_inputs, "Inputs: [");
 	for (int i = 0; i < 7; i++) {
-		sprintf(string_inputs, "%ld", inputs[i].phase_error.tv_nsec);
+		strcat(string_inputs, "%ld", inputs[i].phase_error.tv_nsec);
 		if (i != 6)
-			sprintf(string_inputs, ", ");
+			strcat(string_inputs, ", ");
 		else
-			sprintf(string_inputs, "]");
+			strcat(string_inputs, "]");
 	}
 	log_info(string_inputs);
 }
