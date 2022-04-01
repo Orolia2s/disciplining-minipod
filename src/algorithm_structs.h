@@ -43,6 +43,7 @@ struct kalman_parameters {
  * @brief Algorithm data stored in od context
  */
 struct algorithm_state {
+	struct od_input inputs[7];
 	/** State value */
 	enum Disciplining_State status;
 	/** Frequency adjustement for one value on the fine control */

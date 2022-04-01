@@ -263,6 +263,20 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 	return kalman->Kphase;
 }
 
+static void print_inputs(struct od_input inputs[7])
+{
+	char string_inputs[2048];
+	sprintf(string_inputs, "Inputs: [");
+	for (int i = 0; i < 7; i++) {
+		sprintf(string_inputs, "%ld", inputs[i].phase_error.tv_nsec);
+		if (i != 6)
+			sprintf(string_inputs, ", ");
+		else
+			sprintf(string_inputs, "]");
+	}
+	log_info(string_inputs);
+}
+
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
@@ -315,82 +329,84 @@ int od_process(struct od *od, const struct od_input *input,
 
 	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
 		od->state.status, input->valid, input->lock);
+	memcpy(&(state->inputs[state->od_process_count]), input, sizeof(struct od_input));
+	if (state->od_process_count == 6) {
+		state->od_process_count = 0;
+		print_inputs(state->inputs);
 
-	if (input->valid && input->lock)
-	{
-		if (od->state.status != CALIBRATION
-			&& (
-				config->calibrate_first
-				|| input->calibration_requested
+		if (input->valid && input->lock)
+		{
+			if (od->state.status != CALIBRATION
+				&& (
+					config->calibrate_first
+					|| input->calibration_requested
+				)
 			)
-		)
-		{
-			config->calibrate_first = false;
-			output->action = CALIBRATE;
-			od->state.status = CALIBRATION;
-			return 0;
-		}
-		/** Invalid control value, need to check mRO control values
-		 * If calibration has been done, we need to make a control check of the mRO
-		 */
-		if (state->invalid_ctrl || state->status == CALIBRATION)
-		{
-			if(!control_check_mRO(od, input, output))
 			{
-				/* Control check has not been passed.
-				* Either a Coarse alignement or a calibration process
-				* has been decided and prepared in output
-				*/
-				state->calib = false;
-				log_debug("Control_check_mro has not been passed !");
+				config->calibrate_first = false;
+				output->action = CALIBRATE;
+				od->state.status = CALIBRATION;
 				return 0;
 			}
-			log_debug("Control check mRO has been passed !");
-			state->calib = false;
-			state->status = INIT;
+			/** Invalid control value, need to check mRO control values
+			 * If calibration has been done, we need to make a control check of the mRO
+			 */
+			if (state->invalid_ctrl || state->status == CALIBRATION)
+			{
+				if(!control_check_mRO(od, input, output))
+				{
+					/* Control check has not been passed.
+					* Either a Coarse alignement or a calibration process
+					* has been decided and prepared in output
+					*/
+					state->calib = false;
+					log_debug("Control_check_mro has not been passed !");
+					return 0;
+				}
+				log_debug("Control check mRO has been passed !");
+				state->calib = false;
+				state->status = INIT;
 
-			/* Request coarse value to be saved in mRO50 memory */
-			output->action = SAVE_DISCIPLINING_PARAMETERS;
-			return 0;
-		}
+				/* Request coarse value to be saved in mRO50 memory */
+				output->action = SAVE_DISCIPLINING_PARAMETERS;
+				return 0;
+			}
 
-		/* Initialization */
-		if (state->status == INIT)
-		{
-			if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium_factory;
-				log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium;
-				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else {
-				if (dsc_parameters->coarse_equilibrium < 0)
-					log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
-						"consider calibration if disciplining is not efficient");
+			/* Initialization */
+			if (state->status == INIT)
+			{
+				if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
+					output->action = ADJUST_COARSE;
+					output->setpoint = dsc_parameters->coarse_equilibrium_factory;
+					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
+					output->action = ADJUST_COARSE;
+					output->setpoint = dsc_parameters->coarse_equilibrium;
+					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else {
+					if (dsc_parameters->coarse_equilibrium < 0)
+						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
+							"consider calibration if disciplining is not efficient");
+					output->action = ADJUST_FINE;
+					output->setpoint = state->estimated_equilibrium;
+					state->status = PHASE_ADJUSTMENT;
+					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
+
+				}
+				return 0;
+			}
+			/* Holdover and valid flag switched to valid,
+			* We wait for one cycle to start disciplining again
+			*/
+			else if (state->status == HOLDOVER)
+			{
+				state->status = PHASE_ADJUSTMENT;
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
-				state->status = PHASE_ADJUSTMENT;
-				log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
-
+				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 			}
-			return 0;
-		}
-		/* Holdover and valid flag switched to valid,
-		 * We wait for one cycle to start disciplining again
-		 */
-		else if (state->status == HOLDOVER)
-		{
-			state->status = PHASE_ADJUSTMENT;
-			output->action = ADJUST_FINE;
-			output->setpoint = state->estimated_equilibrium;
-			log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
-		}
-		else
-		{
-			if (state->od_process_count == 5) {
-				state->od_process_count = 0;
+			else
+			{
 				if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
 				{
 					/* Call Main loop */
@@ -502,17 +518,17 @@ int od_process(struct od *od, const struct od_input *input,
 					output->value_phase_ctrl = input->phase_error.tv_nsec;
 					return 0;
 				}
-			} else {
-				state->od_process_count++;
-				output->action = NO_OP;
 			}
+		} else {
+			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+			log_info("Applying estimated equilibirum until going out of holdover");
+			state->status = HOLDOVER;
+			output->action = ADJUST_FINE;
+			output->setpoint = state->estimated_equilibrium_ES;
 		}
 	} else {
-		log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-		log_info("Applying estimated equilibirum until going out of holdover");
-		state->status = HOLDOVER;
-		output->action = ADJUST_FINE;
-		output->setpoint = state->estimated_equilibrium_ES;
+		state->od_process_count++;
+		output->action = NO_OP;
 	}
 	return 0;
 }
