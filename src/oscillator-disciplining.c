@@ -265,14 +265,19 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 
 static void print_inputs(struct od_input inputs[7])
 {
-	char string_inputs[2048];
+	char string_inputs[1024];
+	char string_tmp[100];
 	sprintf(string_inputs, "Inputs: [");
 	for (int i = 0; i < 7; i++) {
-		strcat(string_inputs, "%ld", inputs[i].phase_error.tv_nsec);
-		if (i != 6)
-			strcat(string_inputs, ", ");
-		else
-			strcat(string_inputs, "]");
+		sprintf(string_tmp, "%ld", inputs[i].phase_error.tv_nsec);
+		strcat(string_inputs, string_tmp);
+		if (i != 6) {
+			sprintf(string_inputs, ", ");
+			strcat(string_inputs, string_tmp);
+		} else {
+			sprintf(string_inputs, "]");
+			strcat(string_inputs, string_tmp);
+		}
 	}
 	log_info(string_inputs);
 }
