@@ -76,24 +76,45 @@ int simple_linear_reg(float x[], float y[], int length, struct linear_func_param
 	mean_x = sum(x, length) / length;
 	mean_y = sum(y, length) / length;
 
-	float ss_x[length];
-	float ss_y[length];
+	float xy[length];
+	float xx[length];
 	for (int i = 0; i < length; i++) {
-		ss_x[i] = x[i] * (y[i] - mean_y);
-		ss_y[i] = x[i] * (x[i] - mean_x);
+		xy[i] = x[i] * (y[i] - mean_y);
+		xx[i] = x[i] * (x[i] - mean_x);
 
-		if (ss_x[i] == HUGE_VAL || ss_y[i] == HUGE_VAL) {
-			log_error("HUGE_VAL detected ! ss_x[%d] is %f and ss_y[%d] is %f", i, ss_x[i], i, ss_y[i]);
+		if (xy[i] == HUGE_VAL || xx[i] == HUGE_VAL) {
+			log_error("HUGE_VAL detected ! xy[%d] is %f and xx[%d] is %f", i, xy[i], i, xx[i]);
 			return -ERANGE;
 		}
 	}
-	float sum_ss_y = sum(ss_y, length);
-	if (sum_ss_y == 0.0) {
-		log_error("sum_ss_y is equal to 0");
+	float sxy = sum(xy, length);
+	float sxx = sum(xx, length);
+	if (sxx == 0.0) {
+		log_error("sxx is equal to 0");
 		return -EINVAL;
 	}
-	func_params->a = sum(ss_x, length) / sum_ss_y;
+	func_params->a = sxy / sxx;
 	func_params->b = mean_y - func_params->a * mean_x;
+
+	float y2[length];
+	for (int i = 0; i < length; i++) {
+		y2[i] = y[i]*y[i];
+	}
+
+	//Sum of squares total
+	float sst = sum(y2,length) - length*mean_y*mean_y;
+
+	//Sum of squares regression
+	float ssr = func_params->a * sxy;
+
+	//Sum of squares errors
+	float sse = sst - ssr;
+
+	func_params->R2 = ssr / sst;
+	float sigma2 = sse/(length-2);
+
+	func_params->a_std = sqrt(sigma2 / sxx);
+	func_params->b_std = sqrt(sigma2 * ((1/length) + (mean_x*mean_x / sxx)));
 
 	return 0;
 }
