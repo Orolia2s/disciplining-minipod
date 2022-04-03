@@ -114,7 +114,7 @@ int simple_linear_reg(float x[], float y[], int length, struct linear_func_param
 	float sigma2 = sse/(length-2);
 
 	func_params->a_std = sqrt(sigma2 / sxx);
-	func_params->b_std = sqrt(sigma2 * ((1/length) + (mean_x*mean_x / sxx)));
+	func_params->b_std = sqrt(sigma2 * (1/(float)length + pow(mean_x,2)/sxx));
 
 	return 0;
 }
