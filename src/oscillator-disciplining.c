@@ -124,7 +124,6 @@ static int init_algorithm_state(struct od * od) {
 	/* Init state variables */
 	state->status = INIT;
 	state->calib = false;
-	state->invalid_ctrl = false;
 
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
@@ -140,7 +139,7 @@ static int init_algorithm_state(struct od * od) {
 	state->estimated_drift = 0;
 	state->od_process_count = 0;
 	state->tracking_phase_convergence_count = 0;
-	state->tracking_phase_convergence_count_threshold = round(5.0 / ALPHA_ES_TRACKING);
+	state->tracking_phase_convergence_count_threshold = TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD;
 
 	log_debug("state->convergence_count_threshold %u", state->tracking_phase_convergence_count_threshold);
 
@@ -340,7 +339,7 @@ int od_process(struct od *od, const struct od_input *input,
 			/** Invalid control value, need to check mRO control values
 			 * If calibration has been done, we need to make a control check of the mRO
 			 */
-			if (state->invalid_ctrl || state->status == CALIBRATION)
+			if (state->status == CALIBRATION)
 			{
 				if(!control_check_mRO(od, input, output))
 				{
@@ -436,8 +435,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_info("Filtered phase is %f", filtered_phase);
 
 					/* Phase error is below reference and control value in midrange */
-					if ((fabs(mean_phase_error) < config->ref_fluctuations_ns
-						|| state->tracking_phase_convergence_count > state->tracking_phase_convergence_count_threshold)
+					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
 						&& fabs((state->inputs[6].phase_error.tv_nsec + (float) state->inputs[6].qErr / PS_IN_NS)
@@ -476,11 +474,21 @@ int od_process(struct od *od, const struct od_input *input,
 						&& state->estimated_equilibrium_ES >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
 						&& state->estimated_equilibrium_ES <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
+						/* Switch to LOCK_LOW_RESOLUTION */
 						log_info("Smoothing convergence reached");
 						state->estimated_drift = react_coeff;
 						output->action = ADJUST_FINE;
 						output->setpoint = state->estimated_equilibrium_ES;
-					} else if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+						return 0;
+					} else if (state->tracking_phase_convergence_count > 5 * state->tracking_phase_convergence_count_threshold) {
+						log_warn("Estimated equilibrium is out of range !");
+						/* TODO: Call function to adjust coarse */
+						// ACTION 
+						return 0;
+					}
+					
+					/* tracking_phase_convergence_count is below tracking_phase_convergence_count_threshold*/
+					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
 						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
 					{
 						state->estimated_drift = react_coeff;
