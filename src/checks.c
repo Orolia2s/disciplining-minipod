@@ -5,7 +5,7 @@
 #include "algorithm_structs.h"
 #include "log.h"
 
-bool check_gnss_valid_over_cycle(struct od_input *inputs, int length)
+bool check_gnss_valid_over_cycle(struct algorithm_input *inputs, int length)
 {
 	bool gnss_valid = true;
 	int i;
@@ -20,7 +20,7 @@ bool check_gnss_valid_over_cycle(struct od_input *inputs, int length)
 	return gnss_valid;
 }
 
-bool check_lock_over_cycle(struct od_input *inputs, int length)
+bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
 {
 	bool lock_valid = true;
 	int i;
@@ -35,15 +35,14 @@ bool check_lock_over_cycle(struct od_input *inputs, int length)
 	return lock_valid;
 }
 
-bool check_max_drift(struct od_input *inputs, int length)
+bool check_max_drift(struct algorithm_input *inputs, int length)
 {
 	if (inputs == NULL)
 		return false;
 	if (length <= 0)
 		return false;
 
-	if (fabs((inputs[length - 1].phase_error.tv_nsec + (float) inputs[length - 1].qErr / PS_IN_NS)
-		- (inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS))
+	if (fabs(inputs[length - 1].phase_error - inputs[0].phase_error)
 		> DRIFT_COEFFICIENT_ABSOLUTE_MAX * length
 	) {
 		log_warn("Phase error is drifting too fast, a coarse calibration is needed");
@@ -52,7 +51,7 @@ bool check_max_drift(struct od_input *inputs, int length)
 	return true;
 }
 
-bool check_no_outlier(struct od_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
+bool check_no_outlier(struct algorithm_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
 {
 	int i;
 
@@ -62,7 +61,7 @@ bool check_no_outlier(struct od_input *inputs, int length, float mean_phase_erro
 		return false;
 
 	for (i = 0; i < length; i ++) {
-		if (fabs(inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS - mean_phase_error) > ref_fluctuation_ns) {
+		if (fabs(inputs[i].phase_error - mean_phase_error) > ref_fluctuation_ns) {
 			log_warn("Outlier detected at index %d", i);
 			return false;
 		}

@@ -72,11 +72,24 @@ struct kalman_parameters {
 };
 
 /**
+ * @struct algorithm_inputs
+ * @brief Algorithm inputs for Minipod
+ */
+struct algorithm_input {
+	/* Phase error corrected with Quantization Error */
+	float phase_error;
+	/* Flag indicating GNSS data are valid */
+	bool valid;
+	/** Flag indicating mRO50 is locked */
+	bool lock;
+};
+
+/**
  * @struct algorithm_state
  * @brief Algorithm data stored in od context
  */
 struct algorithm_state {
-	struct od_input inputs[7];
+	struct algorithm_input *inputs;
 	/** State value */
 	enum Disciplining_State status;
 	/** Frequency adjustement for one value on the fine control */
@@ -109,8 +122,10 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Kalman filter paramters */
 	struct kalman_parameters kalman;
-	/** Counts how many times od_process has been called */
-	int od_process_count;
+	/** Counts how many inputs has been given to minipod */
+	int od_inputs_count;
+	/** Number of inputs required for a particular state */
+	int od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t tracking_phase_convergence_count;
 	/** Basic count threshold tracking_phase_convergence count */

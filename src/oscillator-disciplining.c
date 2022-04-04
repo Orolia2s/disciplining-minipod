@@ -46,6 +46,10 @@
 #include "phase.h"
 #include "utils.h"
 
+#define WINDOW_TRACKING 6
+#define WINDOW_LOCK_LOW_RESOLUTION 36
+#define WINDOW_LOCK_HIGH_RESOLUTION 106
+
 /**
  * @struct od
  * @brief Library context.
@@ -137,7 +141,6 @@ static int init_algorithm_state(struct od * od) {
 	state->fine_ctrl_value = 0;
 
 	state->estimated_drift = 0;
-	state->od_process_count = 0;
 	state->tracking_phase_convergence_count = 0;
 	state->tracking_phase_convergence_count_threshold = TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD;
 
@@ -149,6 +152,15 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.Kphase = 0.0;
 	state->kalman.q = 1.0;
 	state->kalman.r = 5.0;
+
+	
+	state->od_inputs_for_state = WINDOW_TRACKING;
+	/* Allocate memory for algorithm inputs */
+	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
+	if (!state->inputs) {
+		log_error("Could not allocate memory for algorithm inputs !");
+		return -1;
+	}
 
 	/*
 	 * Check wether nominal parameters should be used or factory ones
@@ -263,6 +275,13 @@ static float get_reactivity(float phase_ns, int sigma, int min, int max, int pow
 	return r > min ? r : min;
 }
 
+static void add_input_to_algorithm(struct algorithm_input *algorithm_input, const struct od_input *input)
+{
+	algorithm_input->phase_error = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
+	algorithm_input->valid = input->valid;
+	algorithm_input->lock = input->lock;
+}
+
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
 {
 	struct od *od;
@@ -315,14 +334,15 @@ int od_process(struct od *od, const struct od_input *input,
 
 	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
 		od->state.status, input->valid, input->lock);
-	memcpy(&(state->inputs[state->od_process_count]), input, sizeof(struct od_input));
+	/* Add new algorithm input */
+	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
 
-	if (state->od_process_count == 6) {
-		state->od_process_count = 0;
+	if (state->od_inputs_count == state->od_inputs_for_state) {
+		state->od_inputs_count = 0;
 		print_inputs(state->inputs);
 
-		if (check_gnss_valid_over_cycle((struct od_input *) &state->inputs, 7)
-			&& check_lock_over_cycle((struct od_input *) &state->inputs, 7))
+		if (check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state)
+			&& check_lock_over_cycle(state->inputs, state->od_inputs_for_state))
 		{
 			if (od->state.status != CALIBRATION
 				&& (
@@ -366,11 +386,17 @@ int od_process(struct od *od, const struct od_input *input,
 
 			/* Initialization */
 			case INIT:
-				if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
+				if (config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium_factory >= 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory)
+				{
 					output->action = ADJUST_COARSE;
 					output->setpoint = dsc_parameters->coarse_equilibrium_factory;
 					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-				} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
+				} else if (!config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium >= 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium)
+				{
 					output->action = ADJUST_COARSE;
 					output->setpoint = dsc_parameters->coarse_equilibrium;
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
@@ -382,7 +408,6 @@ int od_process(struct od *od, const struct od_input *input,
 					output->setpoint = state->estimated_equilibrium;
 					state->status = PHASE_ADJUSTMENT;
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
-
 				}
 				return 0;
 				break;
@@ -399,7 +424,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 			case PHASE_ADJUSTMENT:
 				/* Compute mean phase error over cycle */
-				ret = compute_phase_error_mean((struct od_input *) state->inputs, 7, &mean_phase_error);
+				ret = compute_phase_error_mean(state->inputs, state->od_inputs_for_state, &mean_phase_error);
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
 					state->status = HOLDOVER;
@@ -412,7 +437,9 @@ int od_process(struct od *od, const struct od_input *input,
 				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
 					/* Call Main loop */
-					if (!check_no_outlier((struct od_input *) state->inputs, 7, mean_phase_error, config->ref_fluctuations_ns)) {
+					if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+						mean_phase_error, config->ref_fluctuations_ns))
+					{
 						log_warn("Outlier detected ! entering holdover");
 						state->status = HOLDOVER;
 						output->action = ADJUST_FINE;
@@ -440,8 +467,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
-						&& fabs((state->inputs[6].phase_error.tv_nsec + (float) state->inputs[6].qErr / PS_IN_NS)
-						- (state->inputs[0].phase_error.tv_nsec + (float) state->inputs[0].qErr / PS_IN_NS))
+						&& fabs(state->inputs[WINDOW_TRACKING].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
 						state->estimated_equilibrium_ES =
@@ -550,7 +576,7 @@ int od_process(struct od *od, const struct od_input *input,
 			state->tracking_phase_convergence_count = 0;
 		}
 	} else {
-		state->od_process_count++;
+		state->od_inputs_count++;
 		output->action = NO_OP;
 	}
 	return 0;
@@ -684,7 +710,6 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		log_debug("\t[%d]: %f", i, dsc_parameters->ctrl_drift_coeffs[i]);
 	}
 
-	float interp_value;
 	for (i = 0; i < length; i++)
 		state->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs[i];
 
@@ -720,6 +745,8 @@ void od_destroy(struct od **od)
 	(*od)->state.ctrl_points = NULL;
 	free((*od)->state.ctrl_drift_coeffs);
 	(*od)->state.ctrl_drift_coeffs = NULL;
+	free((*od)->state.inputs);
+	(*od)->state.inputs = NULL;
 	free(*od);
 	*od = NULL;
 }
