@@ -36,7 +36,7 @@ float filter_phase(
 	return kalman->Kphase;
 }
 
-int compute_phase_error_mean(struct od_input *inputs, int length, float *mean_phase_error)
+int compute_phase_error_mean(struct algorithm_input *inputs, int length, float *mean_phase_error)
 {
 	float sum_phase_error = 0.0;
 	int i;
@@ -47,7 +47,7 @@ int compute_phase_error_mean(struct od_input *inputs, int length, float *mean_ph
 		return -1;
 
 	for (i = 0; i < length; i ++)
-		sum_phase_error += inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS;
+		sum_phase_error += inputs[i].phase_error;
 	*mean_phase_error = sum_phase_error / length;
 	return 0;
 }

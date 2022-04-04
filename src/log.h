@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
+#include "algorithm_structs.h"
 
 #define LOG_VERSION "0.1.0"
 
@@ -48,17 +49,16 @@ int log_add_fp(FILE *fp, int level);
 
 void log_log(int level, const char *file, int line, const char *fmt, ...);
 
-static inline void print_inputs(struct od_input inputs[7])
+static inline void print_inputs(struct algorithm_input *inputs)
 {
 	log_info(
-		"Inputs: [%f, %f, %f, %f, %f, %f, %f]",
-		(float) inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS,
-		(float) inputs[1].phase_error.tv_nsec + (float) inputs[1].qErr / PS_IN_NS,
-		(float) inputs[2].phase_error.tv_nsec + (float) inputs[2].qErr / PS_IN_NS,
-		(float) inputs[3].phase_error.tv_nsec + (float) inputs[3].qErr / PS_IN_NS,
-		(float) inputs[4].phase_error.tv_nsec + (float) inputs[4].qErr / PS_IN_NS,
-		(float) inputs[5].phase_error.tv_nsec + (float) inputs[5].qErr / PS_IN_NS,
-		(float) inputs[6].phase_error.tv_nsec + (float) inputs[6].qErr / PS_IN_NS
+		"Inputs: [%f, %f, %f, %f, %f, %f]",
+		inputs[0].phase_error,
+		inputs[1].phase_error,
+		inputs[2].phase_error,
+		inputs[3].phase_error,
+		inputs[4].phase_error,
+		inputs[5].phase_error
 	);
 }
 
