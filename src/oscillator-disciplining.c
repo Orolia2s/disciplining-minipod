@@ -67,6 +67,11 @@
  */
 #define ALPHA_ES 0.01
 /**
+ * Smooth exponential factor for estimated equilibrium
+ * used during tracking phase
+ */
+#define ALPHA_ES_TRACKING 0.018
+/**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
  */
@@ -296,6 +301,87 @@ static float filter_phase(struct kalman_parameters *kalman, float phase, int int
 	return kalman->Kphase;
 }
 
+static int compute_phase_error_mean(struct od_input *inputs, int length, float *mean_phase_error)
+{
+	float sum_phase_error = 0.0;
+	int i;
+
+	if (inputs == NULL)
+		return -1;
+	if (length <= 0)
+		return -1;
+
+	for (i = 0; i < length; i ++)
+		sum_phase_error += inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS;
+	*mean_phase_error = sum_phase_error / length;
+	return 0;
+}
+
+static bool check_gnss_valid_over_cycle(struct od_input *inputs, int length)
+{
+	bool gnss_valid = true;
+	int i;
+
+	if (inputs == NULL)
+		return false;
+	if (length <= 0)
+		return false;
+
+	for (i = 0; i < length; i ++)
+		gnss_valid = gnss_valid & inputs[i].valid;
+	return gnss_valid;
+}
+
+static bool check_lock_over_cycle(struct od_input *inputs, int length)
+{
+	bool lock_valid = true;
+	int i;
+
+	if (inputs == NULL)
+		return false;
+	if (length <= 0)
+		return false;
+
+	for (i = 0; i < length; i ++)
+		lock_valid = lock_valid & inputs[i].lock;
+	return lock_valid;
+}
+
+static bool check_max_drift(struct od_input *inputs, int length)
+{
+	if (inputs == NULL)
+		return false;
+	if (length <= 0)
+		return false;
+
+	if (fabs((inputs[length - 1].phase_error.tv_nsec + (float) inputs[length - 1].qErr / PS_IN_NS)
+		- (inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS))
+		> DRIFT_COEFFICIENT_ABSOLUTE_MAX * length
+	) {
+		log_warn("Phase error is drifting too fast, a coarse calibration is needed");
+		return false;
+	}
+	return true;
+}
+
+static bool check_no_outlier(struct od_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
+{
+	int i;
+
+	if (inputs == NULL)
+		return false;
+	if (length <= 0)
+		return false;
+
+	for (i = 0; i < length; i ++) {
+		if (fabs(inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS - mean_phase_error) > ref_fluctuation_ns) {
+			log_warn("Outlier detected at index %d", i);
+			return false;
+		}
+	}
+	return true;
+}
+
 static void print_inputs(struct od_input inputs[7])
 {
 	log_info(
@@ -368,7 +454,8 @@ int od_process(struct od *od, const struct od_input *input,
 		state->od_process_count = 0;
 		print_inputs(state->inputs);
 
-		if (input->valid && input->lock)
+		if (check_gnss_valid_over_cycle((struct od_input *) &state->inputs, 7)
+			&& check_lock_over_cycle((struct od_input *) &state->inputs, 7))
 		{
 			if (od->state.status != CALIBRATION
 				&& (
@@ -441,47 +528,67 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 			else
 			{
-				if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
+				/* Compute mean phase error over cycle */
+				float mean_phase_error;
+				ret = compute_phase_error_mean((struct od_input *) state->inputs, 7, &mean_phase_error);
+				if (ret != 0) {
+					log_error("Mean phase error could be computed");
+					state->status = HOLDOVER;
+					output->action = ADJUST_FINE;
+					output->setpoint = state->estimated_equilibrium_ES;
+					return 0;
+				}
+				log_debug("Mean Phase error: %f", mean_phase_error);
+				/* Check phase error is below threshold configured */
+				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
 					/* Call Main loop */
-					log_debug("Unfiltered phase error: %ld, qErr: %d", input->phase_error.tv_nsec, input->qErr);
-					float phase = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
-					log_debug("Phase filtered with qErr: %f", phase);
+					if (!check_no_outlier((struct od_input *) state->inputs, 7, mean_phase_error, config->ref_fluctuations_ns)) {
+						log_warn("Outlier detected ! entering holdover");
+						state->status = HOLDOVER;
+						output->action = ADJUST_FINE;
+						output->setpoint = state->estimated_equilibrium_ES;
+						return 0;
+					}
+
+					/* Check phase error is not exceeding maximal drift and that there is not outlier value in cycla */
+					if (!check_max_drift((struct od_input *) state->inputs, 7)) {
+						output->action = CALIBRATE;
+						od->state.status = CALIBRATION;
+						return 0;
+					}
+
+					/* Legacy code used for debug */
 					float filtered_phase = filter_phase(
 						&(state->kalman),
-						phase,
+						mean_phase_error,
 						SETTLING_TIME,
 						state->estimated_drift
 					);
-					float innovation = phase - filtered_phase;
 					log_info("Filtered phase is %f", filtered_phase);
 
-					float x;
-					if (fabs(phase) <= config->ref_fluctuations_ns
-						&& fabs(innovation) <= config->ref_fluctuations_ns)
-						x = filtered_phase;
-					else
-						x = phase;
-
-					if (fabs(x) < config->ref_fluctuations_ns
+					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-						&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
+						&& fabs((state->inputs[6].phase_error.tv_nsec + (float) state->inputs[6].qErr / PS_IN_NS)
+						- (state->inputs[0].phase_error.tv_nsec + (float) state->inputs[0].qErr / PS_IN_NS))
+						< (float) config->ref_fluctuations_ns)
 					{
 						state->estimated_equilibrium_ES =
-							round((ALPHA_ES * state->fine_ctrl_value
-							+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
+							round((ALPHA_ES_TRACKING * state->fine_ctrl_value
+							+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES));
 						log_info("Estimated equilibrium with exponential smooth is %d",
 							state->estimated_equilibrium_ES);
 					}
 
 					float r = get_reactivity(
-						fabs(x),
+						fabs(mean_phase_error),
 						config->ref_fluctuations_ns,
 						config->reactivity_min,
 						config->reactivity_max,
 						config->reactivity_power
 					);
-					float react_coeff = - x / r;
+					float react_coeff = - mean_phase_error / r;
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
 					float interp_value;
