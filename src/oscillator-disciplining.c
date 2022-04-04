@@ -71,6 +71,7 @@
  * used during tracking phase
  */
 #define ALPHA_ES_TRACKING 0.018
+
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -144,6 +145,10 @@ static int init_algorithm_state(struct od * od) {
 	state->estimated_drift = 0;
 	state->fine_ctrl_value = 0;
 	state->od_process_count = 0;
+	state->tracking_phase_convergence_count = 0;
+	state->tracking_phase_convergence_count_threshold = round(5.0 / ALPHA_ES_TRACKING);
+
+	log_debug("state->convergence_count_threshold %u", state->tracking_phase_convergence_count_threshold);
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = config->ref_fluctuations_ns;
@@ -567,7 +572,9 @@ int od_process(struct od *od, const struct od_input *input,
 					);
 					log_info("Filtered phase is %f", filtered_phase);
 
-					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
+					/* Phase error is below reference and control value in midrange */
+					if ((fabs(mean_phase_error) < config->ref_fluctuations_ns
+						|| state->tracking_phase_convergence_count > state->tracking_phase_convergence_count_threshold)
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
 						&& fabs((state->inputs[6].phase_error.tv_nsec + (float) state->inputs[6].qErr / PS_IN_NS)
@@ -577,9 +584,13 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_equilibrium_ES =
 							round((ALPHA_ES_TRACKING * state->fine_ctrl_value
 							+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES));
-						log_info("Estimated equilibrium with exponential smooth is %d",
-							state->estimated_equilibrium_ES);
+						state->tracking_phase_convergence_count++;
+						if (state->tracking_phase_convergence_count  == UINT16_MAX)
+							state->tracking_phase_convergence_count = state->tracking_phase_convergence_count_threshold;
 					}
+					log_info("Estimated equilibrium with exponential smooth is %d",
+						state->estimated_equilibrium_ES);
+					log_debug("convergence_count: %d", state->tracking_phase_convergence_count);
 
 					float r = get_reactivity(
 						fabs(mean_phase_error),
@@ -613,8 +624,17 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					state->fine_ctrl_value = (uint16_t) round(interp_value);
+					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
-					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+					if (state->tracking_phase_convergence_count > state->tracking_phase_convergence_count_threshold
+						&& state->estimated_equilibrium_ES >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
+						&& state->estimated_equilibrium_ES <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+					{
+						log_info("Smoothing convergence reached");
+						state->estimated_drift = react_coeff;
+						output->action = ADJUST_FINE;
+						output->setpoint = state->estimated_equilibrium_ES;
+					} else if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
 						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
 					{
 						state->estimated_drift = react_coeff;
@@ -654,18 +674,23 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					return 0;
 				} else {
-					/* Phase jump needed */
-					output->action = PHASE_JUMP;
-					output->value_phase_ctrl = input->phase_error.tv_nsec;
-					return 0;
+					if (state->tracking_phase_convergence_count <= state->tracking_phase_convergence_count_threshold) {
+						/* Phase jump needed */
+						output->action = PHASE_JUMP;
+						output->value_phase_ctrl = input->phase_error.tv_nsec;
+					} else {
+						output->action = ADJUST_FINE;
+						output->value_phase_ctrl = state->estimated_equilibrium_ES;
+					}
 				}
 			}
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-			log_info("Applying estimated equilibirum until going out of holdover");
+			log_info("Applying estimated equilibrium until going out of holdover");
 			state->status = HOLDOVER;
 			output->action = ADJUST_FINE;
 			output->setpoint = state->estimated_equilibrium_ES;
+			state->tracking_phase_convergence_count = 0;
 		}
 	} else {
 		state->od_process_count++;

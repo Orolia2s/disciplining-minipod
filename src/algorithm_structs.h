@@ -82,6 +82,10 @@ struct algorithm_state {
 	struct kalman_parameters kalman;
 	/** Counts how many times od_process has been called */
 	int od_process_count;
+	/** Counter of number of cycles where phase error is below reference during tracking phase */
+	uint16_t tracking_phase_convergence_count;
+	/** Basic count threshold tracking_phase_convergence count */
+	uint16_t tracking_phase_convergence_count_threshold;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
