@@ -335,12 +335,16 @@ int od_process(struct od *od, const struct od_input *input,
 				output->action = CALIBRATE;
 				od->state.status = CALIBRATION;
 				return 0;
+
 			}
-			/** Invalid control value, need to check mRO control values
-			 * If calibration has been done, we need to make a control check of the mRO
-			 */
-			if (state->status == CALIBRATION)
-			{
+
+			float mean_phase_error;
+			switch(state->status) {
+			/* Calibration: calibration data is available and control check must be done */
+			case CALIBRATION:
+				/** Need to check mRO control values
+				 * If calibration has been done, we need to make a control check of the mRO
+				 */
 				if(!control_check_mRO(od, input, output))
 				{
 					/* Control check has not been passed.
@@ -358,11 +362,10 @@ int od_process(struct od *od, const struct od_input *input,
 				/* Request coarse value to be saved in mRO50 memory */
 				output->action = SAVE_DISCIPLINING_PARAMETERS;
 				return 0;
-			}
+				break;
 
 			/* Initialization */
-			if (state->status == INIT)
-			{
+			case INIT:
 				if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
 					output->action = ADJUST_COARSE;
 					output->setpoint = dsc_parameters->coarse_equilibrium_factory;
@@ -382,21 +385,20 @@ int od_process(struct od *od, const struct od_input *input,
 
 				}
 				return 0;
-			}
+				break;
+
 			/* Holdover and valid flag switched to valid,
 			* We wait for one cycle to start disciplining again
 			*/
-			else if (state->status == HOLDOVER)
-			{
+			case HOLDOVER:
 				state->status = PHASE_ADJUSTMENT;
 				output->action = ADJUST_FINE;
 				output->setpoint = state->estimated_equilibrium;
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
-			}
-			else
-			{
+				break;
+
+			case PHASE_ADJUSTMENT:
 				/* Compute mean phase error over cycle */
-				float mean_phase_error;
 				ret = compute_phase_error_mean((struct od_input *) state->inputs, 7, &mean_phase_error);
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
@@ -537,6 +539,7 @@ int od_process(struct od *od, const struct od_input *input,
 						output->value_phase_ctrl = state->estimated_equilibrium_ES;
 					}
 				}
+				break;
 			}
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
