@@ -24,6 +24,7 @@
 #ifndef ALGORITHM_STRUCTS_H
 #define ALGORITHM_STRUCTS_H
 
+#include <math.h>
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
@@ -46,14 +47,11 @@
 #define FINE_MID_RANGE_MAX 3200
 /**
  * Smooth exponential factor for estimated equilibrium
- * used during holdover phase
- */
-#define ALPHA_ES 0.01
-/**
- * Smooth exponential factor for estimated equilibrium
  * used during tracking phase
  */
 #define ALPHA_ES_TRACKING 0.018
+
+#define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_TRACKING)
 
 /**
  * Maximum drift coefficient
@@ -85,10 +83,6 @@ struct algorithm_state {
 	double mRO_fine_step_sensitivity;
 	/** Frequency adjustement for one value on the coarse control */
 	double mRO_coarse_step_sensitivity;
-	/** Indicate ctrl values (either fine or coarse) is invalid and
-	 * that a mro check must be done
-	 */
-	bool invalid_ctrl;
 	/** Indicate a calibration has been requested either by software or
 	 * user and is on going
 	 */
