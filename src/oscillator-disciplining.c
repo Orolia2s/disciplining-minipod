@@ -552,11 +552,11 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					/* Check phase error is not exceeding maximal drift and that there is not outlier value in cycla */
-					if (!check_max_drift((struct od_input *) state->inputs, 7)) {
-						output->action = CALIBRATE;
-						od->state.status = CALIBRATION;
-						return 0;
-					}
+					// if (!check_max_drift((struct od_input *) state->inputs, 7)) {
+					// 	output->action = CALIBRATE;
+					// 	od->state.status = CALIBRATION;
+					// 	return 0;
+					// }
 
 					/* Legacy code used for debug */
 					float filtered_phase = filter_phase(
