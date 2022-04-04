@@ -543,18 +543,18 @@ int od_process(struct od *od, const struct od_input *input,
 				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
 					/* Call Main loop */
-					/* Check phase error is not exceeding maximal drift and that there is not outlier value in cycla */
-					if (!check_max_drift((struct od_input *) state->inputs, 7)) {
-						output->action = CALIBRATE;
-						od->state.status = CALIBRATION;
-						return 0;
-					}
-
 					if (!check_no_outlier((struct od_input *) state->inputs, 7, mean_phase_error, config->ref_fluctuations_ns)) {
 						log_warn("Outlier detected ! entering holdover");
 						state->status = HOLDOVER;
 						output->action = ADJUST_FINE;
 						output->setpoint = state->estimated_equilibrium_ES;
+						return 0;
+					}
+
+					/* Check phase error is not exceeding maximal drift and that there is not outlier value in cycla */
+					if (!check_max_drift((struct od_input *) state->inputs, 7)) {
+						output->action = CALIBRATE;
+						od->state.status = CALIBRATION;
 						return 0;
 					}
 
