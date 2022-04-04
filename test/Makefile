@@ -13,7 +13,7 @@ OBJS2 = test-minipod-lib.o
 all: test-minipod test-utils-test
 
 test-minipod: test-minipod-lib
-	LD_LIBRARY_PATH=/usr/local/lib ./test-minipod-lib
+	LD_LIBRARY_PATH=/usr/lib:/usr/lib64:/usr/local/lib:/usr/local/lib64:/usr/local/lib/x86_64-linux-gnu ./test-minipod-lib
 
 test-utils-test: $(EXE)
 	./test-utils
