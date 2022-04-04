@@ -39,49 +39,12 @@
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
-#include "parameters.h"
-#include "utils.h"
 #include "algorithm_structs.h"
+#include "checks.h"
 #include "log.h"
-
-/** mRO base fine step sensitivity */
-#define MRO_FINE_STEP_SENSITIVITY -3.E-12
-/** mRO base coarse step sensitivity */
-#define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
-
-/** Minimum possible value of coarse control */
-#define COARSE_RANGE_MIN 0
-/** Maximum possible value of coarse control */
-#define COARSE_RANGE_MAX 4194303
-/** Minimum possible value of fine control */
-#define FINE_RANGE_MIN 0
-/** Maximum possible value of fine control */
-#define FINE_RANGE_MAX 4800
-/** Minimum possible value of fine control used for calibration*/
-#define FINE_MID_RANGE_MIN 1600
-/** Maximum possible value of fine control used for calibration*/
-#define FINE_MID_RANGE_MAX 3200
-/**
- * Smooth exponential factor for estimated equilibrium
- * used during holdover phase
- */
-#define ALPHA_ES 0.01
-/**
- * Smooth exponential factor for estimated equilibrium
- * used during tracking phase
- */
-#define ALPHA_ES_TRACKING 0.018
-
-/**
- * Maximum drift coefficient
- * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
- */
-#define DRIFT_COEFFICIENT_ABSOLUTE_MAX 7.2
-
-#define PS_IN_NS 1000
-
-#define PS_IN_NS 1000
-
+#include "parameters.h"
+#include "phase.h"
+#include "utils.h"
 
 /**
  * @struct od
@@ -97,6 +60,7 @@ struct od {
 
 static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, float *drift_coeffs, uint8_t length) {
 	uint16_t diff_fine;
+	int i;
 
 	/*
 	* Init ctrl_points, which have the same size as
@@ -114,7 +78,7 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
 	log_debug("Control points used:");
-	for (int i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		state->ctrl_points[i] = (float) state->ctrl_range_fine[0] + load_nodes[i] * diff_fine;
 		state->ctrl_drift_coeffs[i] = drift_coeffs[i];
 		log_debug("\t%d: %f -> %f", i, state->ctrl_points[i], state->ctrl_drift_coeffs[i]);
@@ -123,27 +87,57 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 	return 0;
 }
 
+static int compute_fine_value(struct algorithm_state *state, float react_coeff, uint16_t *fine_ctrl_value)
+{
+	float interpolation_value;
+	int ret;
+	ret = lin_interp(
+		state->ctrl_points,
+		state->ctrl_drift_coeffs,
+		state->ctrl_points_length,
+		Y_INTERPOLATION,
+		react_coeff,
+		&interpolation_value
+	);
+	if (ret < 0)
+	{
+		log_error("Error occured in lin_interp: %d", ret);
+		return -1;
+	}
+	/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
+	if (interpolation_value <= 0.0) {
+		log_warn("fine control value found is negative (%f), setting to 0.0", interpolation_value);
+		interpolation_value = 0.0;
+	}
+
+	*fine_ctrl_value = (uint16_t) round(interpolation_value);
+	return 0;
+}
+
 static int init_algorithm_state(struct od * od) {
 	int ret;
-	float interpolation_value;
 
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
 	struct minipod_config *config = &od->minipod_config;
 
 	/* Init state variables */
+	state->status = INIT;
+	state->calib = false;
+	state->invalid_ctrl = false;
+
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
-	state->invalid_ctrl = false;
-	state->calib = false;
-	state->status = INIT;
+
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
 	state->ctrl_range_coarse[1] = COARSE_RANGE_MAX;
 	state->ctrl_range_fine[0] = FINE_MID_RANGE_MIN;
 	state->ctrl_range_fine[1] = FINE_MID_RANGE_MAX;
+
 	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
-	state->estimated_drift = 0;
 	state->fine_ctrl_value = 0;
+
+	state->estimated_drift = 0;
 	state->od_process_count = 0;
 	state->tracking_phase_convergence_count = 0;
 	state->tracking_phase_convergence_count_threshold = round(5.0 / ALPHA_ES_TRACKING);
@@ -152,10 +146,10 @@ static int init_algorithm_state(struct od * od) {
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = config->ref_fluctuations_ns;
+	state->kalman.Kphase_set = false;
 	state->kalman.Kphase = 0.0;
 	state->kalman.q = 1.0;
 	state->kalman.r = 5.0;
-	state->kalman.Kphase_set = false;
 
 	/*
 	 * Check wether nominal parameters should be used or factory ones
@@ -183,20 +177,11 @@ static int init_algorithm_state(struct od * od) {
 	if (ret != 0)
 		return ret;
 
-	ret = lin_interp(
-		state->ctrl_points,
-		state->ctrl_drift_coeffs,
-		state->ctrl_points_length,
-		Y_INTERPOLATION,
-		0,
-		&interpolation_value
-	);
-
-	if (ret < 0) {
-		log_error("Error occured during lin_interp, err %d", -ret);
+	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
+	if (ret != 0) {
+		log_error("Error computing fine value from control drift coefficients");
 		return ret;
 	}
-	state->estimated_equilibrium = (uint32_t) interpolation_value;
 	log_info("Initialization: Estimated equilibirum is %d", state->estimated_equilibrium);
 	state->estimated_equilibrium_ES = state->estimated_equilibrium;
 
@@ -277,128 +262,6 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 static float get_reactivity(float phase_ns, int sigma, int min, int max, int power) {
 	float r = max * exp(-pow(phase_ns/sigma, power));
 	return r > min ? r : min;
-}
-
-static float filter_phase(struct kalman_parameters *kalman, float phase, int interval, float estimated_drift) {
-	/* Init Kalman phase */
-	if (!kalman->Kphase_set) {
-		kalman->Kphase = phase;
-		kalman->Kphase_set = true;
-	}
-
-	/* Predict */
-	kalman->Kphase += interval * estimated_drift;
-	log_debug("kalman->Kphase += interval * estimated_drift = %f", kalman->Kphase);
-	kalman->Ksigma += kalman->q;
-
-	/* Square computing to do it once */
-	float square_Ksigma = pow(kalman->Ksigma, 2);
-	float square_r = pow(kalman->r, 2);
-
-	/* Update */
-	float gain = square_Ksigma / (square_Ksigma + square_r);
-	float innovation = (phase - kalman->Kphase);
-	kalman->Kphase = kalman->Kphase + gain * innovation;
-	kalman->Ksigma = sqrt((square_r * square_Ksigma)
-		/ (square_r + square_Ksigma)
-	);
-
-	return kalman->Kphase;
-}
-
-static int compute_phase_error_mean(struct od_input *inputs, int length, float *mean_phase_error)
-{
-	float sum_phase_error = 0.0;
-	int i;
-
-	if (inputs == NULL)
-		return -1;
-	if (length <= 0)
-		return -1;
-
-	for (i = 0; i < length; i ++)
-		sum_phase_error += inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS;
-	*mean_phase_error = sum_phase_error / length;
-	return 0;
-}
-
-static bool check_gnss_valid_over_cycle(struct od_input *inputs, int length)
-{
-	bool gnss_valid = true;
-	int i;
-
-	if (inputs == NULL)
-		return false;
-	if (length <= 0)
-		return false;
-
-	for (i = 0; i < length; i ++)
-		gnss_valid = gnss_valid & inputs[i].valid;
-	return gnss_valid;
-}
-
-static bool check_lock_over_cycle(struct od_input *inputs, int length)
-{
-	bool lock_valid = true;
-	int i;
-
-	if (inputs == NULL)
-		return false;
-	if (length <= 0)
-		return false;
-
-	for (i = 0; i < length; i ++)
-		lock_valid = lock_valid & inputs[i].lock;
-	return lock_valid;
-}
-
-static bool check_max_drift(struct od_input *inputs, int length)
-{
-	if (inputs == NULL)
-		return false;
-	if (length <= 0)
-		return false;
-
-	if (fabs((inputs[length - 1].phase_error.tv_nsec + (float) inputs[length - 1].qErr / PS_IN_NS)
-		- (inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS))
-		> DRIFT_COEFFICIENT_ABSOLUTE_MAX * length
-	) {
-		log_warn("Phase error is drifting too fast, a coarse calibration is needed");
-		return false;
-	}
-	return true;
-}
-
-static bool check_no_outlier(struct od_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
-{
-	int i;
-
-	if (inputs == NULL)
-		return false;
-	if (length <= 0)
-		return false;
-
-	for (i = 0; i < length; i ++) {
-		if (fabs(inputs[i].phase_error.tv_nsec + (float) inputs[i].qErr / PS_IN_NS - mean_phase_error) > ref_fluctuation_ns) {
-			log_warn("Outlier detected at index %d", i);
-			return false;
-		}
-	}
-	return true;
-}
-
-static void print_inputs(struct od_input inputs[7])
-{
-	log_info(
-		"Inputs: [%f, %f, %f, %f, %f, %f, %f]",
-		(float) inputs[0].phase_error.tv_nsec + (float) inputs[0].qErr / PS_IN_NS,
-		(float) inputs[1].phase_error.tv_nsec + (float) inputs[1].qErr / PS_IN_NS,
-		(float) inputs[2].phase_error.tv_nsec + (float) inputs[2].qErr / PS_IN_NS,
-		(float) inputs[3].phase_error.tv_nsec + (float) inputs[3].qErr / PS_IN_NS,
-		(float) inputs[4].phase_error.tv_nsec + (float) inputs[4].qErr / PS_IN_NS,
-		(float) inputs[5].phase_error.tv_nsec + (float) inputs[5].qErr / PS_IN_NS,
-		(float) inputs[6].phase_error.tv_nsec + (float) inputs[6].qErr / PS_IN_NS
-	);
 }
 
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
@@ -602,28 +465,11 @@ int od_process(struct od *od, const struct od_input *input,
 					float react_coeff = - mean_phase_error / r;
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
-					float interp_value;
-
-					ret = lin_interp(
-						state->ctrl_points,
-						state->ctrl_drift_coeffs,
-						state->ctrl_points_length,
-						Y_INTERPOLATION,
-						react_coeff,
-						&interp_value
-					);
-					if (ret < 0)
-					{
-						log_error("Error occured in lin_interp: %d", ret);
-						return -1;
+					ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
+					if (ret != 0) {
+						log_error("Error computing fine value");
+						return ret;
 					}
-					/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
-					if (interp_value <= 0.0) {
-						log_warn("fine control value found is negative (%f), setting to 0.0", interp_value);
-						interp_value = 0.0;
-					}
-
-					state->fine_ctrl_value = (uint16_t) round(interp_value);
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
 					if (state->tracking_phase_convergence_count > state->tracking_phase_convergence_count_threshold
@@ -710,6 +556,8 @@ int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters
 
 struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 {
+	int i;
+
 	if (od == NULL)
 	{
 		log_error("Library context is null");
@@ -737,7 +585,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		return NULL;
 	}
 
-	for (int i = 0; i < od->dsc_parameters.ctrl_nodes_length; i++)
+	for (i = 0; i < od->dsc_parameters.ctrl_nodes_length; i++)
 	{
 		calib_params->ctrl_points[i] = od->state.ctrl_points[i];
 	}
@@ -763,10 +611,11 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 
 void od_calibrate(struct od *od, struct calibration_parameters *calib_params, struct calibration_results *calib_results)
 {
-	int ret;
-	int length;
 	struct disciplining_parameters *dsc_parameters;
 	struct algorithm_state *state;
+	int length;
+	int i, j;
+	int ret;
 
 	if (od == NULL || calib_params == NULL || calib_results == NULL)
 	{
@@ -793,15 +642,15 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	/* Create array representing all the integers between 0 and n_calibration */
 	float x[calib_params->nb_calibration];
-	for (int i = 0; i < calib_params->nb_calibration; i++)
+	for (i = 0; i < calib_params->nb_calibration; i++)
 		x[i] = (float) i;
 
 	/* Update drift coefficients */
 	log_debug("CALIBRATION: Updating drift coefficients:");
-	for (int i = 0; i < length; i++)
+	for (i = 0; i < length; i++)
 	{
 		float v[calib_params->nb_calibration];
-		for(int j = 0; j < calib_params->nb_calibration; j++)
+		for(j = 0; j < calib_params->nb_calibration; j++)
 			v[j] = *(calib_results->measures + i * calib_params->nb_calibration + j);
 
 		struct linear_func_param func_params;
@@ -825,20 +674,14 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	float interp_value;
-	for (int i = 0; i < length; i++)
+	for (i = 0; i < length; i++)
 		state->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs[i];
-	ret = lin_interp(
-		state->ctrl_points,
-		state->ctrl_drift_coeffs,
-		length,
-		Y_INTERPOLATION,
-		0,
-		&interp_value
-	);
-	if(ret < 0)
-		log_error("od_calibrate: error occured in lin_interp, err %d", ret);
 
-	state->estimated_equilibrium = (uint32_t) interp_value;
+	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
+	if (ret != 0) {
+		log_error("Error computing fine value");
+		return;
+	}
 	log_debug("Estimated equilibrium is now %d", state->estimated_equilibrium);
 	log_debug("Resetting estimated equiblibrium exponential smooth");
 	state->estimated_equilibrium_ES = state->estimated_equilibrium;

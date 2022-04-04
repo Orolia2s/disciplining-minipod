@@ -54,6 +54,13 @@
 #define OD_ERR_MSG_LEN 0x400
 
 /**
+ * @def PS_IN_NS
+ * @brief Number of picoseconds in one nanosecond
+ */
+#define PS_IN_NS 1000
+
+
+/**
  * @struct minipod_config
  * @brief Minipod configuration
  */
@@ -146,20 +153,20 @@ struct disciplining_parameters {
  * algorithm.
  */
 struct od_input {
-	/** Calibration requested by software of user */
-	bool calibration_requested;
-	/** Coarse adjustement setpoint */
-	int32_t coarse_setpoint;
-	/** Fine adjustement setpoint */
-	uint32_t fine_setpoint;
-	/** Quantization Error **/
-	int32_t qErr;
-	/** is mRO locked */
-	bool lock;
-	/** phase error measured between the oscillator and the GNSS */
-	struct timespec phase_error;
 	/** temperature, only used for logging. */
 	double temperature;
+	/** phase error measured between the oscillator and the GNSS */
+	struct timespec phase_error;
+	/** Fine adjustement setpoint */
+	uint32_t fine_setpoint;
+	/** Coarse adjustement setpoint */
+	int32_t coarse_setpoint;
+	/** Quantization Error **/
+	int32_t qErr;
+	/** Calibration requested by software of user */
+	bool calibration_requested;
+	/** is mRO locked */
+	bool lock;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
 };

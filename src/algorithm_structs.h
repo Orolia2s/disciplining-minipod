@@ -26,6 +26,41 @@
 
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
+
+/** mRO base fine step sensitivity */
+#define MRO_FINE_STEP_SENSITIVITY -3.E-12
+/** mRO base coarse step sensitivity */
+#define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
+
+/** Minimum possible value of coarse control */
+#define COARSE_RANGE_MIN 0
+/** Maximum possible value of coarse control */
+#define COARSE_RANGE_MAX 4194303
+/** Minimum possible value of fine control */
+#define FINE_RANGE_MIN 0
+/** Maximum possible value of fine control */
+#define FINE_RANGE_MAX 4800
+/** Minimum possible value of fine control used for calibration*/
+#define FINE_MID_RANGE_MIN 1600
+/** Maximum possible value of fine control used for calibration*/
+#define FINE_MID_RANGE_MAX 3200
+/**
+ * Smooth exponential factor for estimated equilibrium
+ * used during holdover phase
+ */
+#define ALPHA_ES 0.01
+/**
+ * Smooth exponential factor for estimated equilibrium
+ * used during tracking phase
+ */
+#define ALPHA_ES_TRACKING 0.018
+
+/**
+ * Maximum drift coefficient
+ * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
+ */
+#define DRIFT_COEFFICIENT_ABSOLUTE_MAX 7.2
+
 /**
  * @struct kalman_parameters
  * @brief Kalman filter parameters
@@ -73,9 +108,9 @@ struct algorithm_state {
 	/** Fine control value computed by the algorithm */
 	uint16_t fine_ctrl_value;
 	/** Estimated equilibrium value of the fine control */
-	uint32_t estimated_equilibrium;
+	uint16_t estimated_equilibrium;
 	/** Exponential Smooth of the estimated equilibrium */
-	uint32_t estimated_equilibrium_ES;
+	uint16_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
 	float estimated_drift;
 	/** Kalman filter paramters */
