@@ -77,7 +77,7 @@
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
 #define LOCK_LOW_RESOLUTION_FINE_DELTA_MAX round(LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX / (3 * fabs(MRO_FINE_STEP_SENSITIVITY_NS)))
-#define LOCK_LOW_RESOLUTION_CYCLES_MAX 300
+#define LOCK_LOW_RESOLUTION_CYCLES_MAX 5 * LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -153,8 +153,6 @@ struct algorithm_state {
 	int od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
-	/** Basic count threshold tracking_phase_convergence count */
-	uint16_t current_phase_convergence_count_threshold;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */

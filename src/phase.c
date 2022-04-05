@@ -49,6 +49,8 @@ int compute_phase_error_mean(struct algorithm_input *inputs, int length, float *
 	for (i = 0; i < length; i ++)
 		sum_phase_error += inputs[i].phase_error;
 	*mean_phase_error = sum_phase_error / length;
+	log_debug("Mean Phase error: %f", *mean_phase_error);
+
 	return 0;
 }
 
