@@ -59,7 +59,7 @@
  * @brief R2 maximum acceptable value in LOCK low resolution phase
  * when computing frequency error and std deviation
  */
-#define R2_THRESHOLD_LOW_RESOLUTION 0.65
+#define R2_THRESHOLD_LOW_RESOLUTION 0.5
 
 #define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_TRACKING)
 #define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_LOCK_LOW_RES)
