@@ -353,7 +353,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
-	log_debug("input: phase_error: %d, qErr: %f", input->phase_error.tv_nsec,input->qErr);
+	log_debug("input: phase_error: %d, qErr: %d", input->phase_error.tv_nsec,input->qErr);
 	log_debug("INPUT[%d] = %f",
 		state->od_inputs_count,
 		state->inputs[state->od_inputs_count].phase_error
