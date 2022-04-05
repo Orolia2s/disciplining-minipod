@@ -360,6 +360,12 @@ int od_process(struct od *od, const struct od_input *input,
 		input->valid ? "True" : "False", input->lock ? "True" : "False");
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
+	log_debug("input: phase_error: %d, qErr: %f", input->phase_error.tv_nsec,input->qErr);
+	log_debug("INPUT[%d] = %f",
+		state->od_inputs_count,
+		state->inputs[state->od_inputs_count].phase_error
+	);
+
 	state->od_inputs_count++;
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
