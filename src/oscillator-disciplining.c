@@ -652,7 +652,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
 						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
 					log_debug("Pure frequency coefficients: %f", coeff);
-					int16_t delta_fine = round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
 					/* Compensate phase error */
 					float frequency_error_pcorr = 0.0;
@@ -665,7 +665,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
 
 					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
-					delta_fine += delta_fine_pcorr;
+					//delta_fine += delta_fine_pcorr;
 					log_debug("Sum delta fine: %d", delta_fine);
 
 					if (abs(delta_fine) > LOCK_LOW_RESOLUTION_FINE_DELTA_MAX) {
