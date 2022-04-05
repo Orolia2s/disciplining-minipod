@@ -18,7 +18,7 @@ float filter_phase(
 
 	/* Predict */
 	kalman->Kphase += interval * estimated_drift;
-	log_debug("kalman->Kphase += interval * estimated_drift = %f", kalman->Kphase);
+	log_trace("kalman->Kphase += interval * estimated_drift = %f", kalman->Kphase);
 	kalman->Ksigma += kalman->q;
 
 	/* Square computing to do it once */
