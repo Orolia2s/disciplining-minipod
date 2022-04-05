@@ -30,8 +30,6 @@
 
 /** mRO base fine step sensitivity */
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
-/** mRO base fine step sensitivity in ns per sec */
-#define MRO_FINE_STEP_SENSITIVITY_NS MRO_FINE_STEP_SENSITIVITY * 1.E9
 /** mRO base coarse step sensitivity */
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
 
@@ -76,7 +74,7 @@
 /**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
-#define LOCK_LOW_RESOLUTION_FINE_DELTA_MAX round(LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX / (3 * fabs(MRO_FINE_STEP_SENSITIVITY_NS)))
+#define LOCK_LOW_RESOLUTION_FINE_DELTA_MAX round(LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
 #define LOCK_LOW_RESOLUTION_CYCLES_MAX 5 * LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD
 /**
  * Maximum drift coefficient

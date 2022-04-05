@@ -172,7 +172,7 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.q = 1.0;
 	state->kalman.r = 5.0;
 
-	
+	state->od_inputs_count = 0;
 	state->od_inputs_for_state = WINDOW_TRACKING;
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -355,6 +355,7 @@ int od_process(struct od *od, const struct od_input *input,
 		od->state.status, input->valid, input->lock);
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
+	state->od_inputs_count++;
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
@@ -629,7 +630,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 				if (R2 > R2_THRESHOLD_LOW_RESOLUTION) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
-					if (frequency_error > LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX) {
+					if (fabs(frequency_error) > LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX) {
 						log_warn("Strong drift detected");
 
 						/* We authorize such strong drift at first step of the phase */
@@ -648,19 +649,19 @@ int od_process(struct od *od, const struct od_input *input,
 
 					float coeff = 0.0;
 					/* Compensate pure frequency error only */
-					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs(MRO_FINE_STEP_SENSITIVITY_NS))
+					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
 						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
 					log_debug("Pure frequency coefficients: %f", coeff);
-					int16_t delta_fine = round(coeff * frequency_error / MRO_FINE_STEP_SENSITIVITY_NS);
+					int16_t delta_fine = round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
 					/* Compensate phase error */
 					float frequency_error_pcorr = 0.0;
 					int16_t delta_fine_pcorr = 0;
-					if (mean_phase_error >= config->ref_fluctuations_ns) {
+					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
 						frequency_error_pcorr = - mean_phase_error / LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY;
 					}
-					if (fabs(frequency_error_pcorr) > fabs(MRO_FINE_STEP_SENSITIVITY_NS))
-						delta_fine_pcorr = frequency_error_pcorr / MRO_FINE_STEP_SENSITIVITY_NS - input->fine_setpoint;
+					if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+						delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9)) - input->fine_setpoint;
 					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
 
 					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
@@ -695,8 +696,8 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_equilibrium_ES);
 
 					/* Check wether high resolution has been reached */
-					if (frequency_error < LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN &&
-						abs(delta_fine) <= LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN / fabs(MRO_FINE_STEP_SENSITIVITY_NS)) {
+					if (fabs(frequency_error) < LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN &&
+						abs(delta_fine) <= LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
 						log_warn("GOING TO HIGH RES BUT NOT CODED YET");
 						/* TODO: Add switch to LOCK HIGH RES */
 						return 0;
@@ -728,7 +729,6 @@ int od_process(struct od *od, const struct od_input *input,
 			state->current_phase_convergence_count = 0;
 		}
 	} else {
-		state->od_inputs_count++;
 		output->action = NO_OP;
 	}
 	return 0;
