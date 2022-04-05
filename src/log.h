@@ -49,18 +49,4 @@ int log_add_fp(FILE *fp, int level);
 
 void log_log(int level, const char *file, int line, const char *fmt, ...);
 
-static inline void print_inputs(struct algorithm_input *inputs)
-{
-	log_info(
-		"Inputs: [%f, %f, %f, %f, %f, %f]",
-		inputs[0].phase_error,
-		inputs[1].phase_error,
-		inputs[2].phase_error,
-		inputs[3].phase_error,
-		inputs[4].phase_error,
-		inputs[5].phase_error
-	);
-}
-
-
 #endif

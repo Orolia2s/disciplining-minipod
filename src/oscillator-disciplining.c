@@ -120,6 +120,26 @@ static int compute_fine_value(struct algorithm_state *state, float react_coeff, 
 	return 0;
 }
 
+static void print_inputs(struct algorithm_input *inputs, int length)
+{
+	int i;
+	if (!inputs || length <= 0)
+		return;
+	char * str = calloc((length + 2) * 16, sizeof(char));
+	strcat(str, "Inputs: [");
+	for (i = 0; i < length; i++) {
+		char float_num[14];
+		sprintf(float_num, "%.3f", inputs[i].phase_error);
+		strcat(str, float_num);
+		if (i < length -1)
+		strcat(str, ", ");
+	}
+	strcat(str, "]");
+	log_info(str);
+	free(str);
+	str = NULL;
+}
+
 static int init_algorithm_state(struct od * od) {
 	int ret;
 
@@ -338,7 +358,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
-		print_inputs(state->inputs);
+		print_inputs(state->inputs, WINDOW_TRACKING);
 
 		if (check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state)
 			&& check_lock_over_cycle(state->inputs, state->od_inputs_for_state))
@@ -575,9 +595,13 @@ int od_process(struct od *od, const struct od_input *input,
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
 					state->current_phase_convergence_count = LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD;
-				print_inputs(state->inputs);
+				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
 				/* Compute mean phase error over cycle */
-				ret = compute_phase_error_mean(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50, &mean_phase_error);
+				ret = compute_phase_error_mean(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50,
+					&mean_phase_error
+				);
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
 					state->current_phase_convergence_count = 0;
