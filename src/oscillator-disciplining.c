@@ -351,15 +351,29 @@ int od_process(struct od *od, const struct od_input *input,
 	struct minipod_config *config = &(od->minipod_config);
 	output->action = NO_OP;
 
-	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
-		od->state.status, input->valid, input->lock);
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
+	log_debug("input: phase_error: %d, qErr: %d", input->phase_error.tv_nsec,input->qErr);
+	log_debug("INPUT[%d] = %f",
+		state->od_inputs_count,
+		state->inputs[state->od_inputs_count].phase_error
+	);
 	state->od_inputs_count++;
+
+	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
+		od->state.status == INIT ? "INIT" :
+		od->state.status == TRACKING ? "TRACKING" :
+		od->state.status == HOLDOVER ? "HOLDOVER" :
+		od->state.status == CALIBRATION ? "CALIBRATION" :
+		"LOCK_LOW_RESOLUTION",
+		state->current_phase_convergence_count,
+		state->od_inputs_count,
+		state->od_inputs_for_state,
+		input->valid ? "True" : "False", input->lock ? "True" : "False");
+
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
-		print_inputs(state->inputs, WINDOW_TRACKING);
 
 		if (check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state)
 			&& check_lock_over_cycle(state->inputs, state->od_inputs_for_state))
@@ -444,6 +458,7 @@ int od_process(struct od *od, const struct od_input *input,
 				break;
 
 			case TRACKING:
+				print_inputs(state->inputs, WINDOW_TRACKING);
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(state->inputs, state->od_inputs_for_state, &mean_phase_error);
 				if (ret != 0) {
@@ -604,7 +619,7 @@ int od_process(struct od *od, const struct od_input *input,
 					&mean_phase_error
 				);
 				if (ret != 0) {
-					log_error("Mean phase error could be computed");
+					log_error("Mean phase error could not be computed");
 					state->current_phase_convergence_count = 0;
 					state->status = HOLDOVER;
 					state->od_inputs_for_state = WINDOW_TRACKING;
