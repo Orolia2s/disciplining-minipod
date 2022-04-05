@@ -30,6 +30,8 @@
 
 /** mRO base fine step sensitivity */
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
+/** mRO base fine step sensitivity in ns per sec */
+#define MRO_FINE_STEP_SENSITIVITY_NS MRO_FINE_STEP_SENSITIVITY * 1.E9
 /** mRO base coarse step sensitivity */
 #define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
 
@@ -46,13 +48,36 @@
 /** Maximum possible value of fine control used for calibration*/
 #define FINE_MID_RANGE_MAX 3200
 /**
- * Smooth exponential factor for estimated equilibrium
+ * @brief Smooth exponential factor for estimated equilibrium
  * used during tracking phase
  */
 #define ALPHA_ES_TRACKING 0.018
+/**
+ * @brief Smooth exponential factor for estimated equilibrium
+ * used during tracking phase
+ */
+#define ALPHA_ES_LOCK_LOW_RES 0.06
+/**
+ * @brief R2 maximum acceptable value in LOCK low resolution phase
+ * when computing frequency error and std deviation
+ */
+#define R2_THRESHOLD_LOW_RESOLUTION 0.65
 
 #define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_TRACKING)
-
+#define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_LOCK_LOW_RES)
+/**
+ * @brief Maximum acceptable frequency error in ns per s
+ */
+#define LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX 0.5
+/**
+ * @brief Minimum frequency error in low res to go into Lock High resolution mode
+ */
+#define LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN 0.05
+/**
+ * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
+ */
+#define LOCK_LOW_RESOLUTION_FINE_DELTA_MAX round(LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX / (3 * fabs(MRO_FINE_STEP_SENSITIVITY_NS)))
+#define LOCK_LOW_RESOLUTION_CYCLES_MAX 300
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -127,9 +152,9 @@ struct algorithm_state {
 	/** Number of inputs required for a particular state */
 	int od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
-	uint16_t tracking_phase_convergence_count;
+	uint16_t current_phase_convergence_count;
 	/** Basic count threshold tracking_phase_convergence count */
-	uint16_t tracking_phase_convergence_count_threshold;
+	uint16_t current_phase_convergence_count_threshold;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
