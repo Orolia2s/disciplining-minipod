@@ -212,12 +212,14 @@ struct od_output {
 enum Disciplining_State {
 	/** Initialization State */
 	INIT,
-	/** Phase adjustement State, nominal one */
-	PHASE_ADJUSTMENT,
+	/** Quick convergence phase, tracking phase error to reach 0 */
+	TRACKING,
 	/** Holdover state, when gnss data is not valid */
 	HOLDOVER,
 	/** Calibration state, when drift coefficients are computed */
 	CALIBRATION,
+	/** Low resolution lock mode */
+	LOCK_LOW_RESOLUTION,
 };
 
 /**

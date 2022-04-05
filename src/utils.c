@@ -67,6 +67,7 @@ static int bisect_right(float values[], int length, float x) {
 int simple_linear_reg(float x[], float y[], int length, struct linear_func_param * func_params) {
 	float mean_x;
 	float mean_y;
+	int i;
 	
 	if (length <= 0) {
 		log_error("simple_linear_red: length cannot be negative");
@@ -78,7 +79,7 @@ int simple_linear_reg(float x[], float y[], int length, struct linear_func_param
 
 	float xy[length];
 	float xx[length];
-	for (int i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		xy[i] = x[i] * (y[i] - mean_y);
 		xx[i] = x[i] * (x[i] - mean_x);
 
@@ -97,7 +98,7 @@ int simple_linear_reg(float x[], float y[], int length, struct linear_func_param
 	func_params->b = mean_y - func_params->a * mean_x;
 
 	float y2[length];
-	for (int i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		y2[i] = y[i]*y[i];
 	}
 
@@ -168,6 +169,7 @@ int lin_interp(float x[], float y[], int length, bool x_interp, float interp_val
 
 	return 0;
 }
+
 
 void file_cleanup(FILE **f)
 {
