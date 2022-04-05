@@ -351,13 +351,6 @@ int od_process(struct od *od, const struct od_input *input,
 	struct minipod_config *config = &(od->minipod_config);
 	output->action = NO_OP;
 
-	log_debug("OD_PROCESS: State is %s, GNSS valid: %s and mRO lock: %s",
-		od->state.status == INIT ? "INIT" :
-		od->state.status == TRACKING ? "TRACKING" :
-		od->state.status == HOLDOVER ? "HOLDOVER" :
-		od->state.status == CALIBRATION ? "CALIBRATION" :
-		"LOCK_LOW_RESOLUTION",
-		input->valid ? "True" : "False", input->lock ? "True" : "False");
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
 	log_debug("input: phase_error: %d, qErr: %f", input->phase_error.tv_nsec,input->qErr);
@@ -365,8 +358,18 @@ int od_process(struct od *od, const struct od_input *input,
 		state->od_inputs_count,
 		state->inputs[state->od_inputs_count].phase_error
 	);
-
 	state->od_inputs_count++;
+
+	log_debug("OD_PROCESS: State is %s (%u/%u), GNSS valid: %s and mRO lock: %s",
+		od->state.status == INIT ? "INIT" :
+		od->state.status == TRACKING ? "TRACKING" :
+		od->state.status == HOLDOVER ? "HOLDOVER" :
+		od->state.status == CALIBRATION ? "CALIBRATION" :
+		"LOCK_LOW_RESOLUTION",
+		state->od_inputs_count,
+		state->od_inputs_for_state,
+		input->valid ? "True" : "False", input->lock ? "True" : "False");
+
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
@@ -615,7 +618,7 @@ int od_process(struct od *od, const struct od_input *input,
 					&mean_phase_error
 				);
 				if (ret != 0) {
-					log_error("Mean phase error could be computed");
+					log_error("Mean phase error could not be computed");
 					state->current_phase_convergence_count = 0;
 					state->status = HOLDOVER;
 					state->od_inputs_for_state = WINDOW_TRACKING;
