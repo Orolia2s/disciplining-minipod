@@ -490,13 +490,13 @@ int od_process(struct od *od, const struct od_input *input,
 					// }
 
 					/* Legacy code used for debug */
-					float filtered_phase = filter_phase(
-						&(state->kalman),
-						mean_phase_error,
-						SETTLING_TIME,
-						state->estimated_drift
-					);
-					log_info("Filtered phase is %f", filtered_phase);
+					// float filtered_phase = filter_phase(
+					// 	&(state->kalman),
+					// 	mean_phase_error,
+					// 	SETTLING_TIME,
+					// 	state->estimated_drift
+					// );
+					// log_info("Filtered phase is %f", filtered_phase);
 
 					/* Phase error is below reference and control value in midrange */
 					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
