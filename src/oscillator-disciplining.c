@@ -360,12 +360,13 @@ int od_process(struct od *od, const struct od_input *input,
 	);
 	state->od_inputs_count++;
 
-	log_debug("OD_PROCESS: State is %s (%u/%u), GNSS valid: %s and mRO lock: %s",
+	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
 		od->state.status == INIT ? "INIT" :
 		od->state.status == TRACKING ? "TRACKING" :
 		od->state.status == HOLDOVER ? "HOLDOVER" :
 		od->state.status == CALIBRATION ? "CALIBRATION" :
 		"LOCK_LOW_RESOLUTION",
+		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		state->od_inputs_for_state,
 		input->valid ? "True" : "False", input->lock ? "True" : "False");
