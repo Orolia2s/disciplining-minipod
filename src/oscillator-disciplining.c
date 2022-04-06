@@ -64,6 +64,14 @@ struct od {
 	struct disciplining_parameters dsc_parameters;
 };
 
+static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
+{
+	output->action = action;
+	output->setpoint = setpoint;
+	output->value_phase_ctrl = value_phase_ctrl;
+	return;
+}
+
 static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, float *drift_coeffs, uint8_t length) {
 	uint16_t diff_fine;
 	int i;
@@ -242,7 +250,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 				log_debug("ctrl_drift_coeffs[%d] = %f is greater than ctrl_drift_coeffs[%d] = %f",
 					i, state->ctrl_drift_coeffs[i], i + 1, state->ctrl_drift_coeffs[i+1]);
 				log_warn("Calibration coefficients are not descending with fine values");
-				output->action = CALIBRATE;
+				set_output(output, CALIBRATE, 0, 0);
 				return false;
 			}
 		}
@@ -251,7 +259,7 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 			if (fabs(state->ctrl_drift_coeffs[i]) > DRIFT_COEFFICIENT_ABSOLUTE_MAX) {
 				log_warn("ctrl_drift_coeffs[%d] coefficient is greater than %f in absolute: %f",
 					i, DRIFT_COEFFICIENT_ABSOLUTE_MAX, state->ctrl_drift_coeffs[i]);
-				output->action = CALIBRATE;
+				set_output(output, CALIBRATE, 0, 0);
 				return false;
 			}
 		}
@@ -277,14 +285,12 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 				-config->max_allowed_coarse;
 		}
 
-		output->setpoint = input->coarse_setpoint + delta_coarse;
-		output->action = ADJUST_COARSE;
-		output->value_phase_ctrl = 0;
+		set_output(output, ADJUST_FINE, input->coarse_setpoint + delta_coarse, 0);
 		log_info("Requesting a coarse alignement to value %d", output->setpoint);
 		return false;
 	} else {
 		/* mRO needs to be calibrated */
-		output->action = CALIBRATE;
+		set_output(output, CALIBRATE, 0, 0);
 		return false;
 	}
 }
@@ -349,7 +355,7 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
-	output->action = NO_OP;
+	set_output(output, NO_OP, 0, 0);
 
 	/* Add new algorithm input */
 	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
@@ -386,7 +392,8 @@ int od_process(struct od *od, const struct od_input *input,
 			)
 			{
 				config->calibrate_first = false;
-				output->action = CALIBRATE;
+				set_output(output, CALIBRATE, 0, 0);
+				/* FIXME !*/
 				od->state.status = CALIBRATION;
 				return 0;
 
@@ -414,7 +421,7 @@ int od_process(struct od *od, const struct od_input *input,
 				state->status = INIT;
 
 				/* Request coarse value to be saved in mRO50 memory */
-				output->action = SAVE_DISCIPLINING_PARAMETERS;
+				set_output(output, SAVE_DISCIPLINING_PARAMETERS, 0, 0);
 				return 0;
 				break;
 
@@ -424,22 +431,19 @@ int od_process(struct od *od, const struct od_input *input,
 					&& dsc_parameters->coarse_equilibrium_factory >= 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory)
 				{
-					output->action = ADJUST_COARSE;
-					output->setpoint = dsc_parameters->coarse_equilibrium_factory;
+					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
 					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else if (!config->oscillator_factory_settings
 					&& dsc_parameters->coarse_equilibrium >= 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium)
 				{
-					output->action = ADJUST_COARSE;
-					output->setpoint = dsc_parameters->coarse_equilibrium;
+					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else {
 					if (dsc_parameters->coarse_equilibrium < 0)
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
-					output->action = ADJUST_FINE;
-					output->setpoint = state->estimated_equilibrium;
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
 					state->status = TRACKING;
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
@@ -452,8 +456,8 @@ int od_process(struct od *od, const struct od_input *input,
 			case HOLDOVER:
 				state->status = TRACKING;
 				state->od_inputs_for_state = WINDOW_TRACKING;
-				output->action = ADJUST_FINE;
-				output->setpoint = state->estimated_equilibrium;
+				state->current_phase_convergence_count = 0;
+				set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 				break;
 
@@ -464,8 +468,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
 					state->status = HOLDOVER;
-					output->action = ADJUST_FINE;
-					output->setpoint = state->estimated_equilibrium_ES;
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
 				/* Check phase error is below threshold configured */
@@ -477,8 +480,7 @@ int od_process(struct od *od, const struct od_input *input,
 					{
 						log_warn("Outlier detected ! entering holdover");
 						state->status = HOLDOVER;
-						output->action = ADJUST_FINE;
-						output->setpoint = state->estimated_equilibrium_ES;
+						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 						return 0;
 					}
 
@@ -540,8 +542,7 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Smooth convergence reached, adjust to estimated equilibrium smooth */
 						log_info("Smoothing convergence reached");
 						state->estimated_drift = react_coeff;
-						output->action = ADJUST_FINE;
-						output->setpoint = state->estimated_equilibrium_ES;
+						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
 						state->status = LOCK_LOW_RESOLUTION;
@@ -560,8 +561,7 @@ int od_process(struct od *od, const struct od_input *input,
 						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
 					{
 						state->estimated_drift = react_coeff;
-						output->action = ADJUST_FINE;
-						output->setpoint = state->fine_ctrl_value;
+						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 					}
 					else
 					{
@@ -590,20 +590,17 @@ int od_process(struct od *od, const struct od_input *input,
 							log_error("Error occured in lin_interp: %d", ret);
 							return -1;
 						}
-
-						output->action = ADJUST_FINE;
-						output->setpoint = stop_value;
+						set_output(output, ADJUST_FINE, stop_value, 0);
 					}
 					return 0;
 				} else {
 					if (state->current_phase_convergence_count <= TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
 						/* Phase jump needed */
-						output->action = PHASE_JUMP;
-						output->value_phase_ctrl = input->phase_error.tv_nsec;
+						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
 					} else {
-						output->action = ADJUST_FINE;
-						output->value_phase_ctrl = state->estimated_equilibrium_ES;
+						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					}
+					return 0;
 				}
 				break;
 			case LOCK_LOW_RESOLUTION:
@@ -623,8 +620,7 @@ int od_process(struct od *od, const struct od_input *input,
 					state->current_phase_convergence_count = 0;
 					state->status = HOLDOVER;
 					state->od_inputs_for_state = WINDOW_TRACKING;
-					output->action = ADJUST_FINE;
-					output->setpoint = state->estimated_equilibrium_ES;
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
 
@@ -652,13 +648,14 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > 1
 							&& state->current_phase_convergence_count < LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
 							log_warn("NO OPERATION");
-							output->action = NO_OP;
+							set_output(output, NO_OP, 0, 0);
 							return 0;
 						} else if (state->current_phase_convergence_count > LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
 							state->current_phase_convergence_count = 0;
+							state->od_inputs_for_state = WINDOW_TRACKING;
 							state->status = TRACKING;
-							output->action = ADJUST_FINE;
-							output->setpoint = state->estimated_equilibrium_ES;
+							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							return 0;
 						}
 					}
 
@@ -701,8 +698,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					/* Apply computed fine  */
-					output->action = ADJUST_FINE;
-					output->setpoint = new_fine;
+					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
 						round((ALPHA_ES_LOCK_LOW_RES * new_fine
@@ -726,9 +722,8 @@ int od_process(struct od *od, const struct od_input *input,
 				} else {
 					log_warn("Low linear fit quality");
 					log_warn("NO OPERATION");
-					output->action = NO_OP;
+					set_output(output, NO_OP, 0, 0);
 				}
-
 
 				break;
 			default:
@@ -739,12 +734,11 @@ int od_process(struct od *od, const struct od_input *input,
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
 			state->status = HOLDOVER;
-			output->action = ADJUST_FINE;
-			output->setpoint = state->estimated_equilibrium_ES;
 			state->current_phase_convergence_count = 0;
+			set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 		}
 	} else {
-		output->action = NO_OP;
+		set_output(output, NO_OP, 0, 0);
 	}
 	return 0;
 }
