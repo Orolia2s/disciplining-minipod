@@ -692,9 +692,15 @@ int od_process(struct od *od, const struct od_input *input,
 							LOCK_LOW_RESOLUTION_FINE_DELTA_MAX;
 					}
 
-					/* TODO check corner cases */
-					uint16_t new_fine = input->fine_setpoint + delta_fine;
+					uint16_t new_fine;
+					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						new_fine = FINE_MID_RANGE_MIN + config->fine_stop_tolerance;
+					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						new_fine = FINE_MID_RANGE_MAX - config->fine_stop_tolerance;
+					else
+						new_fine = input->fine_setpoint + delta_fine;
 					log_debug("NEW FINE value: %u", new_fine);
+
 					uint16_t new_fine_from_calib;
 					ret = compute_fine_value(state, coeff*frequency_error, &new_fine_from_calib);
 					if (ret != 0) {
