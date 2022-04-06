@@ -519,9 +519,16 @@ int od_process(struct od *od, const struct od_input *input,
 						&& fabs(state->inputs[WINDOW_TRACKING].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
-						state->estimated_equilibrium_ES =
-							round((ALPHA_ES_TRACKING * state->fine_ctrl_value
-							+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES));
+						if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
+							log_debug("fast smoothing convergence : 2.0 * ALPHA_ES_TRACKING applied");
+							state->estimated_equilibrium_ES =
+								round((2.0 * ALPHA_ES_TRACKING * state->fine_ctrl_value
+								+ (1.0 - (2.0 * ALPHA_ES_TRACKING)) * state->estimated_equilibrium_ES));
+						} else {
+							state->estimated_equilibrium_ES =
+								round((ALPHA_ES_TRACKING * state->fine_ctrl_value
+								+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES));
+						}
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
 							state->current_phase_convergence_count = TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD;
