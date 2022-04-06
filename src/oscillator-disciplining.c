@@ -677,9 +677,9 @@ int od_process(struct od *od, const struct od_input *input,
 					int16_t delta_fine_pcorr = 0;
 					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
 						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
+						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 					}
-					if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
-						delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9)) - input->fine_setpoint;
 					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
 
 					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
