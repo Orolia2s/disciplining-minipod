@@ -54,15 +54,15 @@
  * @brief Smooth exponential factor for estimated equilibrium
  * used during tracking phase
  */
-#define ALPHA_ES_LOCK_LOW_RES 0.06
+#define ALPHA_ES_LOCK_LOW_RES 0.198
 /**
  * @brief R2 maximum acceptable value in LOCK low resolution phase
  * when computing frequency error and std deviation
  */
 #define R2_THRESHOLD_LOW_RESOLUTION 0.5
 
-#define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_TRACKING)
-#define LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_LOCK_LOW_RES)
+#define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(5.0 / ALPHA_ES_TRACKING)
+#define LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD round(5.0 / ALPHA_ES_LOCK_LOW_RES)
 /**
  * @brief Maximum acceptable frequency error in ns per s
  */
