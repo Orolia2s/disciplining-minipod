@@ -618,7 +618,7 @@ int od_process(struct od *od, const struct od_input *input,
 				state->current_phase_convergence_count++;
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
-					state->current_phase_convergence_count = LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD;
+					state->current_phase_convergence_count = LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD;
 				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(
@@ -650,16 +650,16 @@ int od_process(struct od *od, const struct od_input *input,
 
 				if (R2 > R2_THRESHOLD_LOW_RESOLUTION) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
-					if (fabs(frequency_error) > LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX) {
+					if (fabs(frequency_error) > LOCK_LOW_RES_FREQUENCY_ERROR_MAX) {
 						log_warn("Strong drift detected");
 
 						/* We authorize such strong drift at first step of the phase */
 						if (state->current_phase_convergence_count > 1
-							&& state->current_phase_convergence_count < LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
+							&& state->current_phase_convergence_count < LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
 							log_warn("NO OPERATION");
 							set_output(output, NO_OP, 0, 0);
 							return 0;
-						} else if (state->current_phase_convergence_count > LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
+						} else if (state->current_phase_convergence_count > LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
 							set_state(state, TRACKING);
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
@@ -687,10 +687,10 @@ int od_process(struct od *od, const struct od_input *input,
 					//delta_fine += delta_fine_pcorr;
 					log_debug("Sum delta fine: %d", delta_fine);
 
-					if (abs(delta_fine) > LOCK_LOW_RESOLUTION_FINE_DELTA_MAX) {
+					if (abs(delta_fine) > LOCK_LOW_RES_FINE_DELTA_MAX) {
 						delta_fine = delta_fine < 0 ?
-							-LOCK_LOW_RESOLUTION_FINE_DELTA_MAX :
-							LOCK_LOW_RESOLUTION_FINE_DELTA_MAX;
+							-LOCK_LOW_RES_FINE_DELTA_MAX :
+							LOCK_LOW_RES_FINE_DELTA_MAX;
 					}
 
 					uint16_t new_fine;
@@ -720,15 +720,15 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_equilibrium_ES);
 
 					/* Check wether high resolution has been reached */
-					if (fabs(frequency_error) < LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN &&
-						abs(delta_fine) <= LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
+					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
+						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
 						log_warn("GOING TO HIGH RES BUT NOT CODED YET");
 						/* TODO: Add switch to LOCK HIGH RES */
 						return 0;
 					}
 
-					if (state->current_phase_convergence_count > LOCK_LOW_RESOLUTION_CYCLES_MAX) {
-						log_warn("No high resolution convergence reached after %d cycles", LOCK_LOW_RESOLUTION_CYCLES_MAX);
+					if (state->current_phase_convergence_count > LOCK_LOW_RES_CYCLES_MAX) {
+						log_warn("No high resolution convergence reached after %d cycles", LOCK_LOW_RES_CYCLES_MAX);
 					}
 
 
