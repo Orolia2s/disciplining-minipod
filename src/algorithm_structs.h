@@ -62,20 +62,20 @@
 #define R2_THRESHOLD_LOW_RESOLUTION 0.5
 
 #define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_TRACKING)
-#define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_LOCK_LOW_RES)
+#define LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD round(3.0 / ALPHA_ES_LOCK_LOW_RES)
 /**
  * @brief Maximum acceptable frequency error in ns per s
  */
-#define LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX 0.5
+#define LOCK_LOW_RES_FREQUENCY_ERROR_MAX 0.5
 /**
  * @brief Minimum frequency error in low res to go into Lock High resolution mode
  */
-#define LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MIN 0.05
+#define LOCK_LOW_RES_FREQUENCY_ERROR_MIN 0.05
 /**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
-#define LOCK_LOW_RESOLUTION_FINE_DELTA_MAX round(LOCK_LOW_RESOLUTION_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
-#define LOCK_LOW_RESOLUTION_CYCLES_MAX 5 * LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD
+#define LOCK_LOW_RES_FINE_DELTA_MAX round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
+#define LOCK_LOW_RES_CYCLES_MAX 5 * LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
