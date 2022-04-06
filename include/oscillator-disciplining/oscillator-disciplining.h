@@ -220,6 +220,7 @@ enum Disciplining_State {
 	CALIBRATION,
 	/** Low resolution lock mode */
 	LOCK_LOW_RESOLUTION,
+	NUM_STATES
 };
 
 /**

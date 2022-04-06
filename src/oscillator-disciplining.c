@@ -52,6 +52,14 @@
 #define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 10 * WINDOW_LOCK_LOW_RESOLUTION
 #define WINDOW_LOCK_HIGH_RESOLUTION 106
 
+uint8_t state_windows[NUM_STATES] = {
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_LOCK_LOW_RESOLUTION
+};
+
 /**
  * @struct od
  * @brief Library context.
@@ -63,6 +71,14 @@ struct od {
 	struct minipod_config minipod_config;
 	struct disciplining_parameters dsc_parameters;
 };
+
+
+static void set_state(struct algorithm_state *state, enum Disciplining_State new_state)
+{
+	state->status = new_state;
+	state->od_inputs_for_state = state_windows[new_state];
+	state->od_inputs_count = 0;
+}
 
 static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
 {
@@ -156,7 +172,7 @@ static int init_algorithm_state(struct od * od) {
 	struct minipod_config *config = &od->minipod_config;
 
 	/* Init state variables */
-	state->status = INIT;
+	set_state(state, INIT);
 	state->calib = false;
 
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
@@ -180,8 +196,6 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.q = 1.0;
 	state->kalman.r = 5.0;
 
-	state->od_inputs_count = 0;
-	state->od_inputs_for_state = WINDOW_TRACKING;
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
 	if (!state->inputs) {
@@ -418,7 +432,7 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 				log_debug("Control check mRO has been passed !");
 				state->calib = false;
-				state->status = INIT;
+				set_state(state, INIT);
 
 				/* Request coarse value to be saved in mRO50 memory */
 				set_output(output, SAVE_DISCIPLINING_PARAMETERS, 0, 0);
@@ -444,7 +458,7 @@ int od_process(struct od *od, const struct od_input *input,
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
 					set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
-					state->status = TRACKING;
+					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
 				return 0;
@@ -454,9 +468,7 @@ int od_process(struct od *od, const struct od_input *input,
 			* We wait for one cycle to start disciplining again
 			*/
 			case HOLDOVER:
-				state->status = TRACKING;
-				state->od_inputs_for_state = WINDOW_TRACKING;
-				state->current_phase_convergence_count = 0;
+				set_state(state, TRACKING);
 				set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 				break;
@@ -467,7 +479,7 @@ int od_process(struct od *od, const struct od_input *input,
 				ret = compute_phase_error_mean(state->inputs, state->od_inputs_for_state, &mean_phase_error);
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
-					state->status = HOLDOVER;
+					set_state(state, HOLDOVER);
 					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
@@ -479,7 +491,7 @@ int od_process(struct od *od, const struct od_input *input,
 						mean_phase_error, config->ref_fluctuations_ns))
 					{
 						log_warn("Outlier detected ! entering holdover");
-						state->status = HOLDOVER;
+						set_state(state, HOLDOVER);
 						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 						return 0;
 					}
@@ -545,9 +557,7 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
-						state->status = LOCK_LOW_RESOLUTION;
-						state->od_inputs_for_state = WINDOW_LOCK_LOW_RESOLUTION;
-						state->current_phase_convergence_count = 0;
+						set_state(state, LOCK_LOW_RESOLUTION);
 						return 0;
 					} else if (state->current_phase_convergence_count > 5 * TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
 						log_warn("Estimated equilibrium is out of range !");
@@ -617,9 +627,7 @@ int od_process(struct od *od, const struct od_input *input,
 				);
 				if (ret != 0) {
 					log_error("Mean phase error could not be computed");
-					state->current_phase_convergence_count = 0;
-					state->status = HOLDOVER;
-					state->od_inputs_for_state = WINDOW_TRACKING;
+					set_state(state, HOLDOVER);
 					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
@@ -651,9 +659,7 @@ int od_process(struct od *od, const struct od_input *input,
 							set_output(output, NO_OP, 0, 0);
 							return 0;
 						} else if (state->current_phase_convergence_count > LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_COUNT_THRESHOLD /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
-							state->current_phase_convergence_count = 0;
-							state->od_inputs_for_state = WINDOW_TRACKING;
-							state->status = TRACKING;
+							set_state(state, TRACKING);
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
 						}
@@ -733,8 +739,7 @@ int od_process(struct od *od, const struct od_input *input,
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
-			state->status = HOLDOVER;
-			state->current_phase_convergence_count = 0;
+			set_state(state, HOLDOVER);
 			set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 		}
 	} else {
