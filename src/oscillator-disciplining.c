@@ -728,7 +728,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					if (state->current_phase_convergence_count > LOCK_LOW_RES_CYCLES_MAX) {
-						log_warn("No high resolution convergence reached after %d cycles", LOCK_LOW_RES_CYCLES_MAX);
+						log_warn("No high resolution convergence reached after %d cycles", state->current_phase_convergence_count);
 					}
 
 
