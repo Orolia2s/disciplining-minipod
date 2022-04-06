@@ -676,7 +676,7 @@ int od_process(struct od *od, const struct od_input *input,
 					float frequency_error_pcorr = 0.0;
 					int16_t delta_fine_pcorr = 0;
 					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
-						frequency_error_pcorr = - mean_phase_error / LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY;
+						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
 					}
 					if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
 						delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9)) - input->fine_setpoint;
@@ -727,7 +727,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					if (state->current_phase_convergence_count > LOCK_LOW_RES_CYCLES_MAX) {
-						log_warn("No high resolution convergence reached after %d cycles", LOCK_LOW_RES_CYCLES_MAX);
+						log_warn("No high resolution convergence reached after %d cycles", state->current_phase_convergence_count);
 					}
 
 
