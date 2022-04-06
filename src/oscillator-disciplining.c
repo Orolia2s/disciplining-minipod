@@ -469,7 +469,7 @@ int od_process(struct od *od, const struct od_input *input,
 			*/
 			case HOLDOVER:
 				set_state(state, TRACKING);
-				set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
+				set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 				break;
 
