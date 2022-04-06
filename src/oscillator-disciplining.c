@@ -558,6 +558,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
 						set_state(state, LOCK_LOW_RESOLUTION);
+						state->current_phase_convergence_count = 0;
 						return 0;
 					} else if (state->current_phase_convergence_count > 5 * TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
 						log_warn("Estimated equilibrium is out of range !");
