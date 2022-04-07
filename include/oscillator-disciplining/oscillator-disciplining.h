@@ -145,6 +145,8 @@ struct disciplining_parameters {
 	uint8_t ctrl_nodes_length;
 	/** Indicate wether calibration parameters are valid */
 	bool calibration_valid;
+	/** estimated_equilibrium ES from previous tracking phases */
+	uint16_t estimated_equilibrium_ES;
 };
 
 /**
