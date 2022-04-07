@@ -117,6 +117,9 @@ int simple_linear_reg(float x[], float y[], int length, struct linear_func_param
 	func_params->a_std = sqrt(sigma2 / sxx);
 	func_params->b_std = sqrt(sigma2 * (1/(float)length + pow(mean_x,2)/sxx));
 
+	// t-test for null slope hypothesis
+	func_params->t0 = fabs(func_params->a/sqrt(sigma2/sxx));
+
 	return 0;
 }
 
