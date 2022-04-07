@@ -574,10 +574,29 @@ int od_process(struct od *od, const struct od_input *input,
 						set_state(state, LOCK_LOW_RESOLUTION);
 						state->current_phase_convergence_count = 0;
 						return 0;
-					} else if (state->current_phase_convergence_count > 5 * round(6.0 / state->alpha_es_tracking)) {
+					} else if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
 						log_warn("Estimated equilibrium is out of range !");
-						/* TODO: Call function to adjust coarse */
-						// ACTION 
+						uint32_t new_coarse = input->coarse_setpoint;
+						if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+							new_coarse = input->coarse_setpoint + 1;
+						else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+							new_coarse = input->coarse_setpoint - 1;
+						log_info("Adjusting coarse value to %u", new_coarse);
+						set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+						/* Reset Tracking state */
+						set_state(state, TRACKING);
+
+						/* Update estimated equilibrium ES to initial guess */
+						if (dsc_parameters->estimated_equilibrium_ES != 0)
+							state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+						else
+							state->estimated_equilibrium_ES = state->estimated_equilibrium;
+
+						if (config->oscillator_factory_settings)
+							dsc_parameters->coarse_equilibrium_factory = new_coarse;
+						else
+							dsc_parameters->coarse_equilibrium = new_coarse;
 						return 0;
 					}
 					
@@ -634,6 +653,35 @@ int od_process(struct od *od, const struct od_input *input,
 				if (state->current_phase_convergence_count  == UINT16_MAX)
 					state->current_phase_convergence_count = round(6.0 / state->alpha_es_lock_low_res);
 				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
+
+				/* Check that estimated equilibrium is within acceptable range */
+				if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+					log_warn("Estimated equilibrium is out of range !");
+					uint32_t new_coarse = input->coarse_setpoint;
+					if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint + 1;
+					else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint - 1;
+					log_info("Adjusting coarse value to %u", new_coarse);
+					set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+					/* Switch to Tracking state */
+					set_state(state, TRACKING);
+
+					/* Update estimated equilibrium ES to initial guess*/
+					if (dsc_parameters->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+					else
+						state->estimated_equilibrium_ES = state->estimated_equilibrium;
+
+					if (config->oscillator_factory_settings)
+						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+					else
+						dsc_parameters->coarse_equilibrium = new_coarse;
+					return 0;
+				}
+
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(
 					&(state->inputs[SETTLING_TIME_MRO50]),
