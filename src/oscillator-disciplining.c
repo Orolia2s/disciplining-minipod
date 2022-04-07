@@ -654,11 +654,16 @@ int od_process(struct od *od, const struct od_input *input,
 					log_error("Error computing frequency_error and standard deviation");
 				}
 				double R2 = func.R2;
+				double t0 = func.t0;
 				double frequency_error = func.a;
 				double frequency_error_std = func.a_std;
-				log_debug("Frequency Error: %f, STD: %f, R2: %f", frequency_error, frequency_error_std, R2);
+				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
 
-				if (R2 > R2_THRESHOLD_LOW_RESOLUTION) {
+				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
+				// must be changed if lock windows size changes or used from a table
+				float t995_ndf58 = 2.663;
+
+				if ((R2 > R2_THRESHOLD_LOW_RESOLUTION) || (t0 < t995_ndf58)) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
 					if (fabs(frequency_error) > LOCK_LOW_RES_FREQUENCY_ERROR_MAX) {
 						log_warn("Strong drift detected");
