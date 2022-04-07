@@ -234,9 +234,11 @@ static int init_algorithm_state(struct od * od) {
 		log_error("Error computing fine value from control drift coefficients");
 		return ret;
 	}
-	log_info("Initialization: Estimated equilibirum is %d", state->estimated_equilibrium);
-	state->estimated_equilibrium_ES = state->estimated_equilibrium;
-
+	if (dsc_parameters->estimated_equilibrium_ES != 0)
+		state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+	else
+		state->estimated_equilibrium_ES = state->estimated_equilibrium;
+	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %d", state->estimated_equilibrium, state->estimated_equilibrium_ES);
 	return 0;
 }
 
@@ -457,7 +459,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (dsc_parameters->coarse_equilibrium < 0)
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
@@ -558,6 +560,8 @@ int od_process(struct od *od, const struct od_input *input,
 						&& state->estimated_equilibrium_ES >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
 						&& state->estimated_equilibrium_ES <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
+						/* Update estimated equilibrium ES in discplining parameters */
+						od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
 						/* Smooth convergence reached, adjust to estimated equilibrium smooth */
 						log_info("Smoothing convergence reached");
 						state->estimated_drift = react_coeff;
@@ -724,6 +728,8 @@ int od_process(struct od *od, const struct od_input *input,
 						+ (1.0 - ALPHA_ES_LOCK_LOW_RES) * state->estimated_equilibrium_ES));
 					log_info("Estimated equilibrium with exponential smooth is %d",
 						state->estimated_equilibrium_ES);
+					/* Update estimated equilibrium ES in discplining parameters */
+					od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
 
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
