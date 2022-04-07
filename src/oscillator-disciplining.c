@@ -72,7 +72,6 @@ struct od {
 	struct disciplining_parameters dsc_parameters;
 };
 
-
 static void set_state(struct algorithm_state *state, enum Disciplining_State new_state)
 {
 	state->status = new_state;
@@ -195,6 +194,10 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.Kphase = 0.0;
 	state->kalman.q = 1.0;
 	state->kalman.r = 5.0;
+
+	/* Init Alpha Equilibrium smooth */
+	state->alpha_es_tracking = od->minipod_config.alpha_global * WINDOW_TRACKING;
+	state->alpha_es_lock_low_res = od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -521,19 +524,19 @@ int od_process(struct od *od, const struct od_input *input,
 						&& fabs(state->inputs[WINDOW_TRACKING].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
-						if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
-							log_debug("fast smoothing convergence : 2.0 * ALPHA_ES_TRACKING applied");
+						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
+							log_debug("fast smoothing convergence : 2.0 * %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
-								round((2.0 * ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - (2.0 * ALPHA_ES_TRACKING)) * state->estimated_equilibrium_ES));
+								round((2.0 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
 						} else {
 							state->estimated_equilibrium_ES =
-								round((ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES));
+								round((state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES));
 						}
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
-							state->current_phase_convergence_count = TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD;
+							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking);
 					}
 					log_info("Estimated equilibrium with exponential smooth is %d",
 						state->estimated_equilibrium_ES);
@@ -556,7 +559,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
-					if (state->current_phase_convergence_count > TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD
+					if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)
 						&& state->estimated_equilibrium_ES >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
 						&& state->estimated_equilibrium_ES <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
@@ -570,7 +573,7 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
 						set_state(state, LOCK_LOW_RESOLUTION);
 						return 0;
-					} else if (state->current_phase_convergence_count > 5 * TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
+					} else if (state->current_phase_convergence_count > 5 * round(6.0 / state->alpha_es_tracking)) {
 						log_warn("Estimated equilibrium is out of range !");
 						/* TODO: Call function to adjust coarse */
 						// ACTION 
@@ -615,7 +618,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					return 0;
 				} else {
-					if (state->current_phase_convergence_count <= TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
+					if (state->current_phase_convergence_count <= round(6.0 / state->alpha_es_tracking)) {
 						/* Phase jump needed */
 						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
 					} else {
@@ -628,7 +631,7 @@ int od_process(struct od *od, const struct od_input *input,
 				state->current_phase_convergence_count++;
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
-					state->current_phase_convergence_count = LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD;
+					state->current_phase_convergence_count = round(6.0 / state->alpha_es_lock_low_res);
 				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(
@@ -670,11 +673,11 @@ int od_process(struct od *od, const struct od_input *input,
 
 						/* We authorize such strong drift at first step of the phase */
 						if (state->current_phase_convergence_count > 1
-							&& state->current_phase_convergence_count < LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD) {
+							&& state->current_phase_convergence_count < round(6.0 / state->alpha_es_lock_low_res)) {
 							log_warn("NO OPERATION");
 							set_output(output, NO_OP, 0, 0);
 							return 0;
-						} else if (state->current_phase_convergence_count > LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
+						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
 							set_state(state, TRACKING);
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
@@ -729,8 +732,8 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						round((ALPHA_ES_LOCK_LOW_RES * new_fine
-						+ (1.0 - ALPHA_ES_LOCK_LOW_RES) * state->estimated_equilibrium_ES));
+						round((state->alpha_es_lock_low_res * new_fine
+						+ (1.0 - state->alpha_es_lock_low_res) * state->estimated_equilibrium_ES));
 					log_info("Estimated equilibrium with exponential smooth is %d",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
@@ -744,7 +747,7 @@ int od_process(struct od *od, const struct od_input *input,
 						return 0;
 					}
 
-					if (state->current_phase_convergence_count > LOCK_LOW_RES_CYCLES_MAX) {
+					if (state->current_phase_convergence_count > 5 * round(6.0 / state->alpha_es_lock_low_res)) {
 						log_warn("No high resolution convergence reached after %d cycles", state->current_phase_convergence_count);
 					}
 

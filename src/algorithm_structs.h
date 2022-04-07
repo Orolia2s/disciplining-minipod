@@ -46,23 +46,11 @@
 /** Maximum possible value of fine control used for calibration*/
 #define FINE_MID_RANGE_MAX 3200
 /**
- * @brief Smooth exponential factor for estimated equilibrium
- * used during tracking phase
- */
-#define ALPHA_ES_TRACKING 0.018
-/**
- * @brief Smooth exponential factor for estimated equilibrium
- * used during tracking phase
- */
-#define ALPHA_ES_LOCK_LOW_RES 0.198
-/**
  * @brief R2 maximum acceptable value in LOCK low resolution phase
  * when computing frequency error and std deviation
  */
 #define R2_THRESHOLD_LOW_RESOLUTION 0.5
 
-#define TRACKING_PHASE_CONVERGENCE_COUNT_THRESHOLD round(6.0 / ALPHA_ES_TRACKING)
-#define LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD round(6.0 / ALPHA_ES_LOCK_LOW_RES)
 /**
  * @brief Maximum acceptable frequency error in ns per s
  */
@@ -75,7 +63,6 @@
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
 #define LOCK_LOW_RES_FINE_DELTA_MAX round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
-#define LOCK_LOW_RES_CYCLES_MAX 5 * LOCK_LOW_RES_PHASE_CONVERGENCE_COUNT_THRESHOLD
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -151,6 +138,10 @@ struct algorithm_state {
 	int od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
+	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
+	float alpha_es_tracking;
+	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
+	float alpha_es_lock_low_res;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
