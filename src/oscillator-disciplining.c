@@ -713,9 +713,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
 				// must be changed if lock windows size changes or used from a table
-				float t995_ndf58 = 2.663;
+				float t9995_ndf58 = 3.467;
 
-				if ((R2 > R2_THRESHOLD_LOW_RESOLUTION) || (t0 < t995_ndf58)) {
+				if ((R2 > R2_THRESHOLD_LOW_RESOLUTION) || (t0 < t9995_ndf58)) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
 					if (fabs(frequency_error) > LOCK_LOW_RES_FREQUENCY_ERROR_MAX) {
 						log_warn("Strong drift detected");
