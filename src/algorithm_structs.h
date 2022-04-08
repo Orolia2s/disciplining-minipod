@@ -141,6 +141,8 @@ struct algorithm_state {
 	uint16_t od_inputs_count;
 	/** Number of inputs required for a particular state */
 	uint16_t od_inputs_for_state;
+	/** Estimated equilibrium value of the fine control */
+	uint16_t estimated_equilibrium;
 	/** Exponential Smooth of the estimated equilibrium */
 	uint16_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
