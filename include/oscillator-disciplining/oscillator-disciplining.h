@@ -51,7 +51,7 @@
  * @def GLOBAL_ALPHA_DEFAULT
  * @brief Default value for Global smoothing convergence
  */
-#define GLOBAL_ALPHA_DEFAULT 0.003
+#define GLOBAL_ALPHA_DEFAULT 0.002
 
 /**
  * @def OD_ERR_MSG_LEN
