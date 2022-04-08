@@ -760,12 +760,12 @@ int od_process(struct od *od, const struct od_input *input,
 					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
 						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
 						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
-							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9)); // check sign !!
 					}
 					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
 
 					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
-					//delta_fine += delta_fine_pcorr;
+					delta_fine += delta_fine_pcorr;
 					log_debug("Sum delta fine: %d", delta_fine);
 
 					if (abs(delta_fine) > LOCK_LOW_RES_FINE_DELTA_MAX) {
@@ -805,7 +805,7 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
 						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)) &&
-						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res)) {
+						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && fabs(mean_phase_error) < 1.5*config->ref_fluctuations_ns ) {
 						log_info("Low frequency error reached, entering LOCK_HIGH_RESOLUTION");
 						set_state(state, LOCK_HIGH_RESOLUTION);
 						return 0;
@@ -897,7 +897,7 @@ int od_process(struct od *od, const struct od_input *input,
 				double frequency_error_std = func.a_std;
 				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
 
-				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
+				// t-test threshold for 99% confidence level null slope with 600-2 degrees of freedom
 				// must be changed if lock windows size changes or used from a table
 				float t995_ndf598 = 3.39;
 
@@ -933,7 +933,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
 
 					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
-					//delta_fine += delta_fine_pcorr;
+					delta_fine += delta_fine_pcorr;
 					log_debug("Sum delta fine: %d", delta_fine);
 
 					if (abs(delta_fine) > LOCK_HIGH_RES_FINE_DELTA_MAX) {
