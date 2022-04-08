@@ -54,20 +54,20 @@
  * @brief R2 maximum acceptable value in LOCK high resolution phase
  * when computing frequency error and std deviation
  */
-#define R2_THRESHOLD_HIGH_RESOLUTION 0.3
+#define R2_THRESHOLD_HIGH_RESOLUTION 0.5
 
 /**
  * @brief Maximum acceptable frequency error in ns per s in Low resolution
  */
 #define LOCK_LOW_RES_FREQUENCY_ERROR_MAX 0.5
 /**
- * @brief Maximum acceptable frequency error in ns per s in High resolution
- */
-#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.05
-/**
  * @brief Minimum frequency error in low res to go into Lock High resolution mode
  */
 #define LOCK_LOW_RES_FREQUENCY_ERROR_MIN 0.05
+/**
+ * @brief Maximum acceptable frequency error in ns per s in High resolution
+ */
+#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.05
 /**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
@@ -136,9 +136,10 @@ struct algorithm_state {
 	/** Median value of the fine range */
 	uint16_t fine_mid;
 	/** Fine control value computed by the algorithm */
-	uint16_t fine_ctrl_value;
-	/** Estimated equilibrium value of the fine control */
-	uint16_t estimated_equilibrium;
+	uint16_t fine_ctrl_value;	/** Counts how many inputs has been given to minipod */
+	uint16_t od_inputs_count;
+	/** Number of inputs required for a particular state */
+	uint16_t od_inputs_for_state;
 	/** Exponential Smooth of the estimated equilibrium */
 	uint16_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
