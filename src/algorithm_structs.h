@@ -50,9 +50,14 @@
  * when computing frequency error and std deviation
  */
 #define R2_THRESHOLD_LOW_RESOLUTION 0.4
+/**
+ * @brief R2 maximum acceptable value in LOCK high resolution phase
+ * when computing frequency error and std deviation
+ */
+#define R2_THRESHOLD_HIGH_RESOLUTION 0.5
 
 /**
- * @brief Maximum acceptable frequency error in ns per s
+ * @brief Maximum acceptable frequency error in ns per s in Low resolution
  */
 #define LOCK_LOW_RES_FREQUENCY_ERROR_MAX 0.5
 /**
@@ -60,9 +65,17 @@
  */
 #define LOCK_LOW_RES_FREQUENCY_ERROR_MIN 0.05
 /**
+ * @brief Maximum acceptable frequency error in ns per s in High resolution
+ */
+#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.05
+/**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
 #define LOCK_LOW_RES_FINE_DELTA_MAX round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
+/**
+ * @brief Maximum acceptable fine adjustment delta authorized in lock Hiugh resolution
+ */
+#define LOCK_HIGH_RES_FINE_DELTA_MAX round(LOCK_HIGH_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -124,6 +137,10 @@ struct algorithm_state {
 	uint16_t fine_mid;
 	/** Fine control value computed by the algorithm */
 	uint16_t fine_ctrl_value;
+	/** Counts how many inputs has been given to minipod */
+	uint16_t od_inputs_count;
+	/** Number of inputs required for a particular state */
+	uint16_t od_inputs_for_state;
 	/** Estimated equilibrium value of the fine control */
 	uint16_t estimated_equilibrium;
 	/** Exponential Smooth of the estimated equilibrium */
@@ -132,16 +149,14 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Kalman filter paramters */
 	struct kalman_parameters kalman;
-	/** Counts how many inputs has been given to minipod */
-	int od_inputs_count;
-	/** Number of inputs required for a particular state */
-	int od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
 	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
 	float alpha_es_tracking;
-	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
+	/** Smooth exponential factor for estimated equilibrium used during lock low resolution phase */
 	float alpha_es_lock_low_res;
+	/** Smooth exponential factor for estimated equilibrium used during lock high resolution phase */
+	float alpha_es_lock_high_res;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */

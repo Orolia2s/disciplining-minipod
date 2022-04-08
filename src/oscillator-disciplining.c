@@ -50,14 +50,16 @@
 #define WINDOW_TRACKING 6
 #define WINDOW_LOCK_LOW_RESOLUTION 66
 #define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 10 * WINDOW_LOCK_LOW_RESOLUTION
-#define WINDOW_LOCK_HIGH_RESOLUTION 106
+#define WINDOW_LOCK_HIGH_RESOLUTION 606
+#define LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 10 * WINDOW_LOCK_HIGH_RESOLUTION
 
-uint8_t state_windows[NUM_STATES] = {
+uint16_t state_windows[NUM_STATES] = {
 	WINDOW_TRACKING,
 	WINDOW_TRACKING,
 	WINDOW_TRACKING,
 	WINDOW_TRACKING,
-	WINDOW_LOCK_LOW_RESOLUTION
+	WINDOW_LOCK_LOW_RESOLUTION,
+	WINDOW_LOCK_HIGH_RESOLUTION
 };
 
 /**
@@ -77,6 +79,7 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 	state->status = new_state;
 	state->od_inputs_for_state = state_windows[new_state];
 	state->od_inputs_count = 0;
+	state->current_phase_convergence_count = 0;
 }
 
 static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
@@ -198,6 +201,7 @@ static int init_algorithm_state(struct od * od) {
 	/* Init Alpha Equilibrium smooth */
 	state->alpha_es_tracking = od->minipod_config.alpha_global * WINDOW_TRACKING;
 	state->alpha_es_lock_low_res = od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
+	state->alpha_es_lock_high_res = od->minipod_config.alpha_global * WINDOW_LOCK_HIGH_RESOLUTION;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -390,7 +394,9 @@ int od_process(struct od *od, const struct od_input *input,
 		od->state.status == TRACKING ? "TRACKING" :
 		od->state.status == HOLDOVER ? "HOLDOVER" :
 		od->state.status == CALIBRATION ? "CALIBRATION" :
-		"LOCK_LOW_RESOLUTION",
+		od->state.status == LOCK_LOW_RESOLUTION ? "LOCK_LOW_RESOLUTION":
+		od->state.status == LOCK_HIGH_RESOLUTION ?"LOCK_HIGH_RESOLUTION":
+		"UNKNOWN_STATE",
 		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		state->od_inputs_for_state,
@@ -647,6 +653,7 @@ int od_process(struct od *od, const struct od_input *input,
 				}
 				break;
 			case LOCK_LOW_RESOLUTION:
+			{
 				state->current_phase_convergence_count++;
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
@@ -678,6 +685,14 @@ int od_process(struct od *od, const struct od_input *input,
 						dsc_parameters->coarse_equilibrium_factory = new_coarse;
 					else
 						dsc_parameters->coarse_equilibrium = new_coarse;
+					return 0;
+				}
+
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
 
@@ -725,7 +740,7 @@ int od_process(struct od *od, const struct od_input *input,
 							log_warn("NO OPERATION");
 							set_output(output, NO_OP, 0, 0);
 							return 0;
-						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) /* && mean_phase_error > 2 * config->ref_fluctuations_ns */) {
+						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
 							set_state(state, TRACKING);
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
@@ -760,10 +775,10 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 
 					uint16_t new_fine;
-					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
-						new_fine = FINE_MID_RANGE_MIN + config->fine_stop_tolerance;
-					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
-						new_fine = FINE_MID_RANGE_MAX - config->fine_stop_tolerance;
+					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
+						new_fine = FINE_MID_RANGE_MIN;
+					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX)
+						new_fine = FINE_MID_RANGE_MAX;
 					else
 						new_fine = input->fine_setpoint + delta_fine;
 					log_debug("NEW FINE value: %u", new_fine);
@@ -789,9 +804,10 @@ int od_process(struct od *od, const struct od_input *input,
 
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
-						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
-						log_warn("GOING TO HIGH RES BUT NOT CODED YET");
-						/* TODO: Add switch to LOCK HIGH RES */
+						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)) &&
+						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res)) {
+						log_info("Low frequency error reached, entering LOCK_HIGH_RESOLUTION");
+						set_state(state, LOCK_HIGH_RESOLUTION);
 						return 0;
 					}
 
@@ -805,8 +821,162 @@ int od_process(struct od *od, const struct od_input *input,
 					log_warn("NO OPERATION");
 					set_output(output, NO_OP, 0, 0);
 				}
-
 				break;
+			}
+			case LOCK_HIGH_RESOLUTION:
+			{
+				state->current_phase_convergence_count++;
+				log_debug("convergence_count: %d", state->current_phase_convergence_count);
+				if (state->current_phase_convergence_count  == UINT16_MAX)
+					state->current_phase_convergence_count = round(6.0 / state->alpha_es_lock_high_res);
+				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50);
+
+				/* Check that estimated equilibrium is within acceptable range */
+				if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+					log_warn("Estimated equilibrium is out of range !");
+					uint32_t new_coarse = input->coarse_setpoint;
+					if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint + 1;
+					else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint - 1;
+					log_info("Adjusting coarse value to %u", new_coarse);
+					set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+					/* Switch to Tracking state */
+					set_state(state, TRACKING);
+
+					/* Update estimated equilibrium ES to initial guess*/
+					if (dsc_parameters->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+					else
+						state->estimated_equilibrium_ES = state->estimated_equilibrium;
+
+					if (config->oscillator_factory_settings)
+						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+					else
+						dsc_parameters->coarse_equilibrium = new_coarse;
+					return 0;
+				}
+
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					return 0;
+				}
+
+
+				/* Compute mean phase error over cycle */
+				ret = compute_phase_error_mean(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50,
+					&mean_phase_error
+				);
+				if (ret != 0) {
+					log_error("Mean phase error could not be computed");
+					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					return 0;
+				}
+
+				/* Compute frequency error */
+				struct linear_func_param func;
+				ret = compute_frequency_error(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50,
+					&func
+				);
+				if (ret != 0) {
+					log_error("Error computing frequency_error and standard deviation");
+					/* FIXME */
+				}
+				double R2 = func.R2;
+				double t0 = func.t0;
+				double frequency_error = func.a;
+				double frequency_error_std = func.a_std;
+				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
+
+				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
+				// must be changed if lock windows size changes or used from a table
+				float t995_ndf598 = 3.39;
+
+				if ((R2 > R2_THRESHOLD_HIGH_RESOLUTION) || (t0 < t995_ndf598)) {
+					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
+					if (fabs(frequency_error) > LOCK_HIGH_RES_FREQUENCY_ERROR_MAX) {
+						log_warn("Strong drift detected");
+
+						/* We authorize such strong drift at first step of the phase */
+						if (state->current_phase_convergence_count > 1) {
+							/* TODO: More elaborate exit conditions depending on mean phase error*/
+							log_warn("NO OPERATION");
+							set_output(output, NO_OP, 0, 0);
+							return 0;
+						}
+					}
+
+					float coeff = 0.0;
+					/* Compensate pure frequency error only */
+					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
+					log_debug("Pure frequency coefficients: %f", coeff);
+					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+
+					/* Compensate phase error */
+					float frequency_error_pcorr = 0.0;
+					int16_t delta_fine_pcorr = 0;
+					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
+						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
+						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+					}
+					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
+
+					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
+					//delta_fine += delta_fine_pcorr;
+					log_debug("Sum delta fine: %d", delta_fine);
+
+					if (abs(delta_fine) > LOCK_HIGH_RES_FINE_DELTA_MAX) {
+						delta_fine = delta_fine < 0 ?
+							-LOCK_HIGH_RES_FINE_DELTA_MAX :
+							LOCK_HIGH_RES_FINE_DELTA_MAX;
+					}
+
+					uint16_t new_fine;
+					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
+						new_fine = FINE_MID_RANGE_MIN;
+					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX)
+						new_fine = FINE_MID_RANGE_MAX;
+					else
+						new_fine = input->fine_setpoint + delta_fine;
+					log_debug("NEW FINE value: %u", new_fine);
+
+					uint16_t new_fine_from_calib;
+					ret = compute_fine_value(state, coeff*frequency_error, &new_fine_from_calib);
+					if (ret != 0) {
+						log_error("Could not compute fine value for log");
+					} else {
+						log_debug("new_fine_from_calib: %u", new_fine_from_calib);
+					}
+
+					/* Apply computed fine  */
+					set_output(output, ADJUST_FINE, new_fine, 0);
+					/* Update estimated equilibrium */
+					state->estimated_equilibrium_ES =
+						round((state->alpha_es_lock_high_res * new_fine
+						+ (1.0 - state->alpha_es_lock_high_res) * state->estimated_equilibrium_ES));
+					log_info("Estimated equilibrium with exponential smooth is %d",
+						state->estimated_equilibrium_ES);
+					/* Update estimated equilibrium ES in discplining parameters */
+					od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
+				} else {
+					log_warn("Low linear fit quality");
+					log_warn("NO OPERATION");
+					set_output(output, NO_OP, 0, 0);
+				}
+				break;
+			}
 			default:
 				log_error("Unhandled state %d", state->status);
 				return -1;
