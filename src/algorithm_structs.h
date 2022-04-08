@@ -136,7 +136,8 @@ struct algorithm_state {
 	/** Median value of the fine range */
 	uint16_t fine_mid;
 	/** Fine control value computed by the algorithm */
-	uint16_t fine_ctrl_value;	/** Counts how many inputs has been given to minipod */
+	uint16_t fine_ctrl_value;
+	/** Counts how many inputs has been given to minipod */
 	uint16_t od_inputs_count;
 	/** Number of inputs required for a particular state */
 	uint16_t od_inputs_for_state;
@@ -146,10 +147,6 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Kalman filter paramters */
 	struct kalman_parameters kalman;
-	/** Counts how many inputs has been given to minipod */
-	uint16_t od_inputs_count;
-	/** Number of inputs required for a particular state */
-	uint16_t od_inputs_for_state;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
 	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
