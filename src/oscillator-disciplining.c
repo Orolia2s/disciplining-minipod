@@ -462,7 +462,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (dsc_parameters->coarse_equilibrium < 0)
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium, 0);
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
