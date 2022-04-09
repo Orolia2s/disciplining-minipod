@@ -199,9 +199,9 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.r = 5.0;
 
 	/* Init Alpha Equilibrium smooth */
-	state->alpha_es_tracking = od->minipod_config.alpha_global * WINDOW_TRACKING;
-	state->alpha_es_lock_low_res = od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
-	state->alpha_es_lock_high_res = od->minipod_config.alpha_global * WINDOW_LOCK_HIGH_RESOLUTION;
+	state->alpha_es_tracking = 0.009 //od->minipod_config.alpha_global * WINDOW_TRACKING;
+	state->alpha_es_lock_low_res = 0.09 //od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
+	state->alpha_es_lock_high_res = 0.5 //od->minipod_config.alpha_global * WINDOW_LOCK_HIGH_RESOLUTION;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -531,10 +531,10 @@ int od_process(struct od *od, const struct od_input *input,
 						< (float) config->ref_fluctuations_ns)
 					{
 						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
-							log_debug("fast smoothing convergence : 2.0 * %f applied", state->alpha_es_tracking);
+							log_debug("fast smoothing convergence : 4.0 * %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
-								round((2.0 * state->alpha_es_tracking * state->fine_ctrl_value
-								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
+								round((4.0 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (4.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
 						} else {
 							state->estimated_equilibrium_ES =
 								round((state->alpha_es_tracking * state->fine_ctrl_value
