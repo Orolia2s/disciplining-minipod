@@ -688,13 +688,6 @@ int od_process(struct od *od, const struct od_input *input,
 					return 0;
 				}
 
-				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
-					mean_phase_error, config->ref_fluctuations_ns))
-				{
-					log_warn("Outlier detected ! Adjust to equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
-					return 0;
-				}
 
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(
@@ -709,6 +702,13 @@ int od_process(struct od *od, const struct od_input *input,
 					return 0;
 				}
 
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					return 0;
+				}
 				/* Compute frequency error */
 				struct linear_func_param func;
 				ret = compute_frequency_error(
@@ -859,15 +859,6 @@ int od_process(struct od *od, const struct od_input *input,
 					return 0;
 				}
 
-				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
-					mean_phase_error, config->ref_fluctuations_ns))
-				{
-					log_warn("Outlier detected ! Adjust to equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
-					return 0;
-				}
-
-
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(
 					&(state->inputs[SETTLING_TIME_MRO50]),
@@ -877,6 +868,14 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Mean phase error could not be computed");
 					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					return 0;
+				}
+
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
 					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 					return 0;
 				}
