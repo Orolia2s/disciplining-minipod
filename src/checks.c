@@ -5,19 +5,51 @@
 #include "algorithm_structs.h"
 #include "log.h"
 
-bool check_gnss_valid_over_cycle(struct algorithm_input *inputs, int length)
+#define GNSS_INVALID_MAX_STREAK 10
+
+enum gnss_state check_gnss_valid_over_cycle(struct algorithm_input *inputs, int length)
 {
-	bool gnss_valid = true;
 	int i;
+	int gnss_invalid_counter = 0;
+	int gnss_invalid_max_streak = 0;
+	int gnss_invalid_current_streak = 0;
+	bool previous_gnss_state;
 
 	if (inputs == NULL)
-		return false;
+		return GNSS_KO;
 	if (length <= 0)
-		return false;
+		return GNSS_KO;
 
-	for (i = 0; i < length; i ++)
-		gnss_valid = gnss_valid & inputs[i].valid;
-	return gnss_valid;
+	if (!inputs[0].valid) {
+		gnss_invalid_counter++;
+		gnss_invalid_current_streak = 1;
+		gnss_invalid_max_streak = 1;
+	}
+	previous_gnss_state = inputs[0].valid;
+
+	for (i = 1; i < length; i ++) {
+		if (!inputs[i].valid) {
+			gnss_invalid_counter++;
+			if (!previous_gnss_state) {
+				gnss_invalid_current_streak++;
+			} else {
+				gnss_invalid_current_streak = 1;
+			}
+		}
+		if (gnss_invalid_max_streak < gnss_invalid_current_streak) {
+			gnss_invalid_max_streak = gnss_invalid_current_streak;
+		}
+		previous_gnss_state = inputs[i].valid;
+	}
+
+	log_trace("check_gnss_valid_over_cycle: gnss_invalid_counter: %d, gnss_invalid_max_streak: %d, ", gnss_invalid_counter, gnss_invalid_max_streak);
+
+	if (gnss_invalid_counter == 0)
+		return GNSS_OK;
+	else if (gnss_invalid_counter < round(length / 3) && gnss_invalid_max_streak < GNSS_INVALID_MAX_STREAK)
+		return GNSS_UNSTABLE;
+	else
+		return GNSS_KO;
 }
 
 bool check_lock_over_cycle(struct algorithm_input *inputs, int length)

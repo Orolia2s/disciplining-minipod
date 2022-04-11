@@ -10,7 +10,10 @@ OBJS= test-utils.o utils.o log.o
 EXE2 = test-minipod-lib
 OBJS2 = test-minipod-lib.o
 
-all: test-minipod test-utils-test
+EXE3 = test-checks
+OBJS3 = test-checks.o checks.o log.o
+
+all: test-minipod test-utils-test test-checks test-checks-test
 
 test-minipod: test-minipod-lib
 	LD_LIBRARY_PATH=/usr/lib:/usr/lib64:/usr/local/lib:/usr/local/lib64:/usr/local/lib/x86_64-linux-gnu ./test-minipod-lib
@@ -18,10 +21,16 @@ test-minipod: test-minipod-lib
 test-utils-test: $(EXE)
 	./test-utils
 
+test-checks-test: $(EXE3)
+	./test-checks
+
 $(EXE): $(OBJS)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 $(EXE2): $(OBJS2)
+	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(EXE3): $(OBJS3)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 test-utils.o : test-utils.c
@@ -33,7 +42,11 @@ utils.o : ../src/utils.c
 log.o : ../src/log.c
 	$(C) $(CPPFLAGS) -c $^ -o $@
 
+checks.o: ../src/checks.c
+	$(C) $(CPPFLAGS) -c $^ -o $@
+
 clean:
 	rm -f *.o
 	rm -f test-utils
 	rm -f test-minipod-lib
+	rm -rf test-checks
