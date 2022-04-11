@@ -531,10 +531,10 @@ int od_process(struct od *od, const struct od_input *input,
 						< (float) config->ref_fluctuations_ns)
 					{
 						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
-							log_debug("fast smoothing convergence : 4.0 * %f applied", state->alpha_es_tracking);
+							log_debug("fast smoothing convergence : 2.0 * %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
-								round((4.0 * state->alpha_es_tracking * state->fine_ctrl_value
-								+ (1.0 - (4.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
+								round((2.0 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
 						} else {
 							state->estimated_equilibrium_ES =
 								round((state->alpha_es_tracking * state->fine_ctrl_value
@@ -928,7 +928,7 @@ int od_process(struct od *od, const struct od_input *input,
 					float frequency_error_pcorr = 0.0;
 					int16_t delta_fine_pcorr = 0;
 					if (fabs(mean_phase_error) >= config->ref_fluctuations_ns) {
-						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
+						frequency_error_pcorr = - mean_phase_error / (LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
 						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
 							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 					}

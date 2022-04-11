@@ -54,7 +54,7 @@
  * @brief R2 maximum acceptable value in LOCK high resolution phase
  * when computing frequency error and std deviation
  */
-#define R2_THRESHOLD_HIGH_RESOLUTION 0.5
+#define R2_THRESHOLD_HIGH_RESOLUTION 0.45
 
 /**
  * @brief Maximum acceptable frequency error in ns per s in Low resolution
