@@ -190,6 +190,7 @@ static int init_algorithm_state(struct od * od) {
 
 	state->estimated_drift = 0;
 	state->current_phase_convergence_count = 0;
+	state->previous_freq_error = 0.0;
 
 	/* Kalman filter parameters */
 	state->kalman.Ksigma = config->ref_fluctuations_ns;
@@ -827,7 +828,6 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 			case LOCK_HIGH_RESOLUTION:
 			{   
-				float previous_freq_error = 0.;
 				state->current_phase_convergence_count++;
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
@@ -948,12 +948,15 @@ int od_process(struct od *od, const struct od_input *input,
 							LOCK_HIGH_RES_FINE_DELTA_MAX;
 					}
 
-					if ((delta_fine > 0) && (current_freq_error > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) && (previous_freq_error > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) && (current_freq_error * previous_freq_error < 0)) {
-						log_debug("frequency sign change since last cycle (%f, %f)",previous_freq_error, current_freq_error);
+					if ((delta_fine > 0) &&
+						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
+						(fabs(current_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
+						(current_freq_error * state->previous_freq_error < 0)
+					) {
+						log_debug("frequency sign change since last cycle (%f, %f)" , state->previous_freq_error, current_freq_error);
 						delta_fine = round(0.5*delta_fine);
 					}
-
-					previous_freq_error = current_freq_error;
+					state->previous_freq_error = current_freq_error;
 
 					uint16_t new_fine;
 					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
