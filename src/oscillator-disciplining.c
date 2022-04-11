@@ -406,9 +406,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
-
-		if (check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state)
-			&& check_lock_over_cycle(state->inputs, state->od_inputs_for_state))
+		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
+		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
+		if (gnss_state == GNSS_OK && mro50_lock_state)
 		{
 			if (od->state.status != CALIBRATION
 				&& (
@@ -1010,6 +1010,9 @@ int od_process(struct od *od, const struct od_input *input,
 				log_error("Unhandled state %d", state->status);
 				return -1;
 			}
+		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
+			log_warn("Unstable GNSS: Applying estimated equilibrium");
+			set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
