@@ -200,7 +200,7 @@ static int init_algorithm_state(struct od * od) {
 	state->kalman.r = 5.0;
 
 	/* Init Alpha Equilibrium smooth */
-	state->alpha_es_tracking = 0.012; //od->minipod_config.alpha_global * WINDOW_TRACKING;
+	state->alpha_es_tracking = 0.015; //od->minipod_config.alpha_global * WINDOW_TRACKING;
 	state->alpha_es_lock_low_res = 0.06; //od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
 	state->alpha_es_lock_high_res = 0.3; //od->minipod_config.alpha_global * WINDOW_LOCK_HIGH_RESOLUTION;
 
