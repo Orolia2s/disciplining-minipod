@@ -83,18 +83,6 @@
 #define DRIFT_COEFFICIENT_ABSOLUTE_MAX 7.2
 
 /**
- * @struct kalman_parameters
- * @brief Kalman filter parameters
- */
-struct kalman_parameters {
-	double Ksigma;
-	double Kphase;
-	float q;
-	float r;
-	bool Kphase_set;
-};
-
-/**
  * @struct algorithm_inputs
  * @brief Algorithm inputs for Minipod
  */
@@ -147,8 +135,6 @@ struct algorithm_state {
 	uint16_t estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
 	float estimated_drift;
-	/** Kalman filter paramters */
-	struct kalman_parameters kalman;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
 	/** Smooth exponential factor for estimated equilibrium used during tracking phase */

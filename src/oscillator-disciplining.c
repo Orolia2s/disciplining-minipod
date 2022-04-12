@@ -192,13 +192,6 @@ static int init_algorithm_state(struct od * od) {
 	state->current_phase_convergence_count = 0;
 	state->previous_freq_error = 0.0;
 
-	/* Kalman filter parameters */
-	state->kalman.Ksigma = config->ref_fluctuations_ns;
-	state->kalman.Kphase_set = false;
-	state->kalman.Kphase = 0.0;
-	state->kalman.q = 1.0;
-	state->kalman.r = 5.0;
-
 	/* Init Alpha Equilibrium smooth */
 	state->alpha_es_tracking = 0.015; //od->minipod_config.alpha_global * WINDOW_TRACKING;
 	state->alpha_es_lock_low_res = 0.06; //od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
@@ -507,22 +500,6 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 						return 0;
 					}
-
-					/* Check phase error is not exceeding maximal drift and that there is not outlier value in cycla */
-					// if (!check_max_drift((struct od_input *) state->inputs, 7)) {
-					// 	output->action = CALIBRATE;
-					// 	od->state.status = CALIBRATION;
-					// 	return 0;
-					// }
-
-					/* Legacy code used for debug */
-					// float filtered_phase = filter_phase(
-					// 	&(state->kalman),
-					// 	mean_phase_error,
-					// 	SETTLING_TIME,
-					// 	state->estimated_drift
-					// );
-					// log_info("Filtered phase is %f", filtered_phase);
 
 					/* Phase error is below reference and control value in midrange */
 					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
