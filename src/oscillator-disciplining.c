@@ -753,7 +753,7 @@ int od_process(struct od *od, const struct od_input *input,
 							LOCK_LOW_RES_FINE_DELTA_MAX;
 					}
 
-					if ((delta_fine > 0) &&
+					if ((abs(delta_fine) > 0) &&
 						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
 						(fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
 						(frequency_error * state->previous_freq_error < 0) &&
