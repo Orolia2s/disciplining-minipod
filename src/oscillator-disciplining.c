@@ -925,7 +925,7 @@ int od_process(struct od *od, const struct od_input *input,
 							log_warn("Applying estimated equilibrium");
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
-						} else if (mean_phase_error > 2.5 * config->ref_fluctuations_ns) {
+						} else if (fabs(mean_phase_error) > 2.5 * config->ref_fluctuations_ns) {
 							set_state(state, LOCK_LOW_RESOLUTION);
 							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
