@@ -71,11 +71,11 @@
 /**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  */
-#define LOCK_LOW_RES_FINE_DELTA_MAX round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
+#define LOCK_LOW_RES_FINE_DELTA_MAX round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (4 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
 /**
  * @brief Maximum acceptable fine adjustment delta authorized in lock Hiugh resolution
  */
-#define LOCK_HIGH_RES_FINE_DELTA_MAX round(LOCK_HIGH_RES_FREQUENCY_ERROR_MAX / (3 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
+#define LOCK_HIGH_RES_FINE_DELTA_MAX round(LOCK_HIGH_RES_FREQUENCY_ERROR_MAX / (4 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
