@@ -738,8 +738,8 @@ int od_process(struct od *od, const struct od_input *input,
 						/* We authorize such strong drift at first step of the phase */
 						if (state->current_phase_convergence_count > 1
 							&& state->current_phase_convergence_count < round(6.0 / state->alpha_es_lock_low_res)) {
-							log_warn("NO OPERATION");
-							set_output(output, NO_OP, 0, 0);
+							log_warn("Applying estimated equilibrium");
+							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
 						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
 							set_state(state, TRACKING);
@@ -820,9 +820,8 @@ int od_process(struct od *od, const struct od_input *input,
 
 
 				} else {
-					log_warn("Low linear fit quality");
-					log_warn("NO OPERATION");
-					set_output(output, NO_OP, 0, 0);
+					log_warn("Low linear fit quality, applying estimated equilibrium");
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 				}
 				break;
 			}
@@ -913,8 +912,12 @@ int od_process(struct od *od, const struct od_input *input,
 						/* We authorize such strong drift at first step of the phase */
 						if (state->current_phase_convergence_count > 1) {
 							/* TODO: More elaborate exit conditions depending on mean phase error*/
-							log_warn("NO OPERATION");
-							set_output(output, NO_OP, 0, 0);
+							log_warn("Applying estimated equilibrium");
+							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							return 0;
+						} else if (mean_phase_error > 2.5 * config->ref_fluctuations_ns) {
+							set_state(state, LOCK_LOW_RESOLUTION);
+							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 							return 0;
 						}
 					}
@@ -951,7 +954,9 @@ int od_process(struct od *od, const struct od_input *input,
 					if ((delta_fine > 0) &&
 						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
 						(fabs(current_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
-						(current_freq_error * state->previous_freq_error < 0)
+						(current_freq_error * state->previous_freq_error < 0) &&
+						(fabs(mean_phase_error) < config->ref_fluctuations_ns)
+
 					) {
 						log_debug("frequency sign change since last cycle (%f, %f)" , state->previous_freq_error, current_freq_error);
 						delta_fine = round(0.5*delta_fine);
@@ -986,9 +991,8 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
 				} else {
-					log_warn("Low linear fit quality");
-					log_warn("NO OPERATION");
-					set_output(output, NO_OP, 0, 0);
+					log_warn("Low linear fit quality, applying estimated equilibrium");
+					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
 				}
 				break;
 			}
