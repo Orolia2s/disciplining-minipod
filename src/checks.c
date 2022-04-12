@@ -67,22 +67,6 @@ bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
 	return lock_valid;
 }
 
-bool check_max_drift(struct algorithm_input *inputs, int length)
-{
-	if (inputs == NULL)
-		return false;
-	if (length <= 0)
-		return false;
-
-	if (fabs(inputs[length - 1].phase_error - inputs[0].phase_error)
-		> DRIFT_COEFFICIENT_ABSOLUTE_MAX * length
-	) {
-		log_warn("Phase error is drifting too fast, a coarse calibration is needed");
-		return false;
-	}
-	return true;
-}
-
 bool check_no_outlier(struct algorithm_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
 {
 	int i;
