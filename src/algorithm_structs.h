@@ -132,7 +132,7 @@ struct algorithm_state {
 	/** Estimated equilibrium value of the fine control */
 	uint16_t estimated_equilibrium;
 	/** Exponential Smooth of the estimated equilibrium */
-	uint16_t estimated_equilibrium_ES;
+	float estimated_equilibrium_ES;
 	/** Estimated drift based on last fine control value and drift coefficients */
 	float estimated_drift;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
