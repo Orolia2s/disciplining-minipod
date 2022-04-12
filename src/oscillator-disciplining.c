@@ -236,10 +236,10 @@ static int init_algorithm_state(struct od * od) {
 		return ret;
 	}
 	if (dsc_parameters->estimated_equilibrium_ES != 0)
-		state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+		state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
 	else
-		state->estimated_equilibrium_ES = state->estimated_equilibrium;
-	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %d", state->estimated_equilibrium, state->estimated_equilibrium_ES);
+		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
 	return 0;
 }
 
@@ -462,7 +462,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (dsc_parameters->coarse_equilibrium < 0)
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
@@ -474,7 +474,7 @@ int od_process(struct od *od, const struct od_input *input,
 			*/
 			case HOLDOVER:
 				set_state(state, TRACKING);
-				set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+				set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 				break;
 
@@ -485,7 +485,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Mean phase error could be computed");
 					set_state(state, HOLDOVER);
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
 				/* Check phase error is below threshold configured */
@@ -497,7 +497,7 @@ int od_process(struct od *od, const struct od_input *input,
 					{
 						log_warn("Outlier detected ! entering holdover");
 						set_state(state, HOLDOVER);
-						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+						set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
 						return 0;
 					}
 
@@ -511,18 +511,18 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
 							log_debug("fast smoothing convergence : 2.0 * %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
-								round((2.0 * state->alpha_es_tracking * state->fine_ctrl_value
-								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES));
+								(2.0 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
 						} else {
 							state->estimated_equilibrium_ES =
-								round((state->alpha_es_tracking * state->fine_ctrl_value
-								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES));
+								(state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES);
 						}
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
 							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking);
 					}
-					log_info("Estimated equilibrium with exponential smooth is %d",
+					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					log_debug("convergence_count: %d", state->current_phase_convergence_count);
 
@@ -544,15 +544,15 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
 					if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)
-						&& state->estimated_equilibrium_ES >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
-						&& state->estimated_equilibrium_ES <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						&& (uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
+						&& (uint32_t) round(state->estimated_equilibrium_ES) <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
 						/* Update estimated equilibrium ES in discplining parameters */
-						od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
+						od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 						/* Smooth convergence reached, adjust to estimated equilibrium smooth */
 						log_info("Smoothing convergence reached");
 						state->estimated_drift = react_coeff;
-						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
 						set_state(state, LOCK_LOW_RESOLUTION);
@@ -560,9 +560,9 @@ int od_process(struct od *od, const struct od_input *input,
 					} else if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
 						log_warn("Estimated equilibrium is out of range !");
 						uint32_t new_coarse = input->coarse_setpoint;
-						if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
 							new_coarse = input->coarse_setpoint + 1;
-						else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 							new_coarse = input->coarse_setpoint - 1;
 						log_info("Adjusting coarse value to %u", new_coarse);
 						set_output(output, ADJUST_COARSE, new_coarse, 0);
@@ -572,9 +572,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 						/* Update estimated equilibrium ES to initial guess */
 						if (dsc_parameters->estimated_equilibrium_ES != 0)
-							state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+							state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
 						else
-							state->estimated_equilibrium_ES = state->estimated_equilibrium;
+							state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 						if (config->oscillator_factory_settings)
 							dsc_parameters->coarse_equilibrium_factory = new_coarse;
@@ -625,7 +625,7 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Phase jump needed */
 						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
 					} else {
-						set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					}
 					return 0;
 				}
@@ -639,13 +639,13 @@ int od_process(struct od *od, const struct od_input *input,
 				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
 
 				/* Check that estimated equilibrium is within acceptable range */
-				if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
-					state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+				if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					(uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
 					log_warn("Estimated equilibrium is out of range !");
 					uint32_t new_coarse = input->coarse_setpoint;
-					if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+					if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
 						new_coarse = input->coarse_setpoint + 1;
-					else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+					else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 						new_coarse = input->coarse_setpoint - 1;
 					log_info("Adjusting coarse value to %u", new_coarse);
 					set_output(output, ADJUST_COARSE, new_coarse, 0);
@@ -655,9 +655,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 					/* Update estimated equilibrium ES to initial guess*/
 					if (dsc_parameters->estimated_equilibrium_ES != 0)
-						state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
 					else
-						state->estimated_equilibrium_ES = state->estimated_equilibrium;
+						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 					if (config->oscillator_factory_settings)
 						dsc_parameters->coarse_equilibrium_factory = new_coarse;
@@ -676,7 +676,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Mean phase error could not be computed");
 					set_state(state, HOLDOVER);
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
 
@@ -684,7 +684,7 @@ int od_process(struct od *od, const struct od_input *input,
 					mean_phase_error, config->ref_fluctuations_ns))
 				{
 					log_warn("Outlier detected ! Adjust to equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
 				/* Compute frequency error */
@@ -715,11 +715,11 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > 1
 							&& state->current_phase_convergence_count < round(6.0 / state->alpha_es_lock_low_res)) {
 							log_warn("Applying estimated equilibrium");
-							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
 							set_state(state, TRACKING);
-							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						}
 					}
@@ -786,12 +786,12 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						round((state->alpha_es_lock_low_res * new_fine
-						+ (1.0 - state->alpha_es_lock_low_res) * state->estimated_equilibrium_ES));
-					log_info("Estimated equilibrium with exponential smooth is %d",
+						(state->alpha_es_lock_low_res * new_fine
+						+ (1.0 - state->alpha_es_lock_low_res) * state->estimated_equilibrium_ES);
+					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
-					od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
+					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
@@ -809,7 +809,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 				} else {
 					log_warn("Low linear fit quality, applying estimated equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 				}
 				break;
 			}
@@ -822,13 +822,13 @@ int od_process(struct od *od, const struct od_input *input,
 				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50);
 
 				/* Check that estimated equilibrium is within acceptable range */
-				if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
-					state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+				if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					(uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
 					log_warn("Estimated equilibrium is out of range !");
 					uint32_t new_coarse = input->coarse_setpoint;
-					if (state->estimated_equilibrium_ES < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+					if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
 						new_coarse = input->coarse_setpoint + 1;
-					else if (state->estimated_equilibrium_ES > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+					else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 						new_coarse = input->coarse_setpoint - 1;
 					log_info("Adjusting coarse value to %u", new_coarse);
 					set_output(output, ADJUST_COARSE, new_coarse, 0);
@@ -838,9 +838,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 					/* Update estimated equilibrium ES to initial guess*/
 					if (dsc_parameters->estimated_equilibrium_ES != 0)
-						state->estimated_equilibrium_ES = dsc_parameters->estimated_equilibrium_ES;
+						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
 					else
-						state->estimated_equilibrium_ES = state->estimated_equilibrium;
+						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 					if (config->oscillator_factory_settings)
 						dsc_parameters->coarse_equilibrium_factory = new_coarse;
@@ -858,7 +858,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Mean phase error could not be computed");
 					set_state(state, HOLDOVER);
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
 
@@ -866,7 +866,7 @@ int od_process(struct od *od, const struct od_input *input,
 					mean_phase_error, config->ref_fluctuations_ns))
 				{
 					log_warn("Outlier detected ! Adjust to equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
 
@@ -900,11 +900,11 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > 1) {
 							/* TODO: More elaborate exit conditions depending on mean phase error*/
 							log_warn("Applying estimated equilibrium");
-							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						} else if (fabs(mean_phase_error) > 2.5 * config->ref_fluctuations_ns) {
 							set_state(state, LOCK_LOW_RESOLUTION);
-							set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						}
 					}
@@ -971,15 +971,15 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						round((state->alpha_es_lock_high_res * new_fine
-						+ (1.0 - state->alpha_es_lock_high_res) * state->estimated_equilibrium_ES));
-					log_info("Estimated equilibrium with exponential smooth is %d",
+						(state->alpha_es_lock_high_res * new_fine
+						+ (1.0 - state->alpha_es_lock_high_res) * state->estimated_equilibrium_ES);
+					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
-					od->dsc_parameters.estimated_equilibrium_ES = state->estimated_equilibrium_ES;
+					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 				} else {
 					log_warn("Low linear fit quality, applying estimated equilibrium");
-					set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 				}
 				break;
 			}
@@ -989,12 +989,12 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
 			log_warn("Unstable GNSS: Applying estimated equilibrium");
-			set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
 			set_state(state, HOLDOVER);
-			set_output(output, ADJUST_FINE, state->estimated_equilibrium_ES, 0);
+			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
 		set_output(output, NO_OP, 0, 0);
@@ -1140,7 +1140,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 	log_debug("Estimated equilibrium is now %d", state->estimated_equilibrium);
 	log_debug("Resetting estimated equiblibrium exponential smooth");
-	state->estimated_equilibrium_ES = state->estimated_equilibrium;
+	state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 	if (state->ctrl_points[length - 1] - state->ctrl_points[0] == 0)
 	{
