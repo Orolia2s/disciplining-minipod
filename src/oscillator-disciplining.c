@@ -786,7 +786,7 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						(state->alpha_es_lock_low_res * new_fine
+						(state->alpha_es_lock_low_res * (new_fine - delta_fine_pcorr)
 						+ (1.0 - state->alpha_es_lock_low_res) * state->estimated_equilibrium_ES);
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
@@ -971,7 +971,7 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						(state->alpha_es_lock_high_res * new_fine
+						(state->alpha_es_lock_high_res * (new_fine - delta_fine_pcorr)
 						+ (1.0 - state->alpha_es_lock_high_res) * state->estimated_equilibrium_ES);
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
