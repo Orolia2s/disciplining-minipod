@@ -725,7 +725,7 @@ int od_process(struct od *od, const struct od_input *input,
 				double frequency_error = func.a;
 				double frequency_error_std = func.a_std;
 				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
-
+				float current_freq_error = frequency_error;
 				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
 				// must be changed if lock windows size changes or used from a table
 				float t9995_ndf58 = 3.467;
@@ -776,6 +776,18 @@ int od_process(struct od *od, const struct od_input *input,
 							-LOCK_LOW_RES_FINE_DELTA_MAX :
 							LOCK_LOW_RES_FINE_DELTA_MAX;
 					}
+
+					if ((delta_fine > 0) &&
+						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
+						(fabs(current_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
+						(current_freq_error * state->previous_freq_error < 0) &&
+						(fabs(mean_phase_error) < config->ref_fluctuations_ns)
+
+					) {
+						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine" , state->previous_freq_error, current_freq_error);
+						delta_fine = round(0.5*delta_fine);
+					}
+					state->previous_freq_error = current_freq_error;
 
 					uint16_t new_fine;
 					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
@@ -958,7 +970,7 @@ int od_process(struct od *od, const struct od_input *input,
 						(fabs(mean_phase_error) < config->ref_fluctuations_ns)
 
 					) {
-						log_debug("frequency sign change since last cycle (%f, %f)" , state->previous_freq_error, current_freq_error);
+						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine" , state->previous_freq_error, current_freq_error);
 						delta_fine = round(0.5*delta_fine);
 					}
 					state->previous_freq_error = current_freq_error;
