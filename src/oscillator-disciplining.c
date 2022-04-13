@@ -917,7 +917,7 @@ int od_process(struct od *od, const struct od_input *input,
 				// must be changed if lock windows size changes or used from a table
 				float t995_ndf598 = 3.39;
 
-				if ((R2 > R2_THRESHOLD_HIGH_RESOLUTION) || (t0 < t995_ndf598)) {
+				if ((R2 > R2_THRESHOLD_HIGH_RESOLUTION) || (t0 < t995_ndf598) || (fabs(frequency_error) < LOCK_HIGH_RES_FREQUENCY_ERROR_MIN)) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
 
 					if (fabs(frequency_error) > LOCK_HIGH_RES_FREQUENCY_ERROR_MAX) {
@@ -941,7 +941,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
-					if (((abs(delta_fine) > 1) && (frequency_error * state->previous_freq_error < 0)) || (t0 < t995_ndf598)) {
+					if ((abs(delta_fine) > 1) && ((frequency_error * state->previous_freq_error < 0) || (t0 < t995_ndf598) || (fabs(frequency_error) < LOCK_HIGH_RES_FREQUENCY_ERROR_MIN))) {
 						log_debug("frequency sign change since last cycle (%f, %f), or flat slope. 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
 						delta_fine = round(0.5*delta_fine);
 					}
