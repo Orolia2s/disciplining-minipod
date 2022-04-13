@@ -193,9 +193,9 @@ static int init_algorithm_state(struct od * od) {
 	state->previous_freq_error = 0.0;
 
 	/* Init Alpha Equilibrium smooth */
-	state->alpha_es_tracking = 0.015; //od->minipod_config.alpha_global * WINDOW_TRACKING;
-	state->alpha_es_lock_low_res = 0.06; //od->minipod_config.alpha_global * WINDOW_LOCK_LOW_RESOLUTION;
-	state->alpha_es_lock_high_res = 0.3; //od->minipod_config.alpha_global * WINDOW_LOCK_HIGH_RESOLUTION;
+	state->alpha_es_tracking = 0.01;
+	state->alpha_es_lock_low_res = 0.05;
+	state->alpha_es_lock_high_res = 0.25;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
