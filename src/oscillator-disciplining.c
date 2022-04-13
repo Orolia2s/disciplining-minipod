@@ -687,6 +687,13 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
+
+				if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
+					set_state(state, TRACKING);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
 				/* Compute frequency error */
 				struct linear_func_param func;
 				ret = compute_frequency_error(
@@ -697,6 +704,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (ret != 0) {
 					log_error("Error computing frequency_error and standard deviation");
 				}
+
 				double R2 = func.R2;
 				double t0 = func.t0;
 				double frequency_error = func.a;
@@ -715,10 +723,6 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > 1
 							&& state->current_phase_convergence_count < round(6.0 / state->alpha_es_lock_low_res)) {
 							log_warn("Applying estimated equilibrium");
-							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
-							return 0;
-						} else if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
-							set_state(state, TRACKING);
 							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						}
@@ -796,7 +800,9 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
 						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)) &&
-						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && fabs(mean_phase_error) < 1.5*config->ref_fluctuations_ns ) {
+						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) &&
+						fabs(mean_phase_error) < 1.5 * config->ref_fluctuations_ns)
+					{
 						log_info("Low frequency error reached, entering LOCK_HIGH_RESOLUTION");
 						set_state(state, LOCK_HIGH_RESOLUTION);
 						return 0;
@@ -805,7 +811,6 @@ int od_process(struct od *od, const struct od_input *input,
 					if (state->current_phase_convergence_count > 5 * round(6.0 / state->alpha_es_lock_low_res)) {
 						log_warn("No high resolution convergence reached after %d cycles", state->current_phase_convergence_count);
 					}
-
 
 				} else {
 					log_warn("Low linear fit quality, applying estimated equilibrium");
@@ -870,6 +875,13 @@ int od_process(struct od *od, const struct od_input *input,
 					return 0;
 				}
 
+				if (fabs(mean_phase_error) > 2.5 * config->ref_fluctuations_ns) {
+					log_warn("Mean phase error too high, going back into Lock Low Resolution");
+					set_state(state, LOCK_LOW_RESOLUTION);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
 				/* Compute frequency error */
 				struct linear_func_param func;
 				ret = compute_frequency_error(
@@ -881,18 +893,19 @@ int od_process(struct od *od, const struct od_input *input,
 					log_error("Error computing frequency_error and standard deviation");
 					/* FIXME */
 				}
+
 				double R2 = func.R2;
 				double t0 = func.t0;
 				double frequency_error = func.a;
 				double frequency_error_std = func.a_std;
 				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
-
 				// t-test threshold for 99% confidence level null slope with 600-2 degrees of freedom
 				// must be changed if lock windows size changes or used from a table
 				float t995_ndf598 = 3.39;
 
 				if ((R2 > R2_THRESHOLD_HIGH_RESOLUTION) || (t0 < t995_ndf598)) {
 					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
+
 					if (fabs(frequency_error) > LOCK_HIGH_RES_FREQUENCY_ERROR_MAX) {
 						log_warn("Strong drift detected");
 
@@ -900,10 +913,6 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > 1) {
 							/* TODO: More elaborate exit conditions depending on mean phase error*/
 							log_warn("Applying estimated equilibrium");
-							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
-							return 0;
-						} else if (fabs(mean_phase_error) > 2.5 * config->ref_fluctuations_ns) {
-							set_state(state, LOCK_LOW_RESOLUTION);
 							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 							return 0;
 						}
