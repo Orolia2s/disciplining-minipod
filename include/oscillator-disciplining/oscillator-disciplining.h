@@ -97,12 +97,14 @@ struct minipod_config {
 	 * ctrl_range_fine[1] - fine_stop_tolerance.
 	 */
 	int fine_stop_tolerance;
-	/** Maxium difference allowed when changin coarse value */
+	/** Maximum difference allowed when changin coarse value */
 	int max_allowed_coarse;
 	/** Triggers calibration when starting the program */
 	bool calibrate_first;
 	/** Define wether to use factory settings or not */
 	bool oscillator_factory_settings;
+	/** Set the track only mode */
+	bool tracking_only;
 };
 
 /**

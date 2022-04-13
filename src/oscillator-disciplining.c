@@ -555,7 +555,8 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 
 						/* Switch to LOCK_LOW_RESOLUTION_STATE */
-						set_state(state, LOCK_LOW_RESOLUTION);
+						if (!config->tracking_only)
+							set_state(state, LOCK_LOW_RESOLUTION);
 						return 0;
 					} else if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
 						log_warn("Estimated equilibrium is out of range !");
