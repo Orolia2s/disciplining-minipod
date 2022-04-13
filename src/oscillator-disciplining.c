@@ -737,10 +737,8 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
-					if ((abs(delta_fine) > 1) &&
-						(frequency_error * state->previous_freq_error < 0)
-					) {
-						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+					if (((abs(delta_fine) > 1) && (frequency_error * state->previous_freq_error < 0)) || (t0 < t9995_ndf58)) {
+						log_debug("frequency sign change since last cycle (%f, %f), or flat slope. 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
 						delta_fine = round(0.5*delta_fine);
 					}
 					state->previous_freq_error = frequency_error;
@@ -923,10 +921,8 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
-					if ((abs(delta_fine) > 1) &&
-						(frequency_error * state->previous_freq_error < 0)
-					) {
-						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+					if (((abs(delta_fine) > 1) && (frequency_error * state->previous_freq_error < 0)) || (t0 < t995_ndf598)) {
+						log_debug("frequency sign change since last cycle (%f, %f), or flat slope. 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
 						delta_fine = round(0.5*delta_fine);
 					}
 					state->previous_freq_error = frequency_error;
