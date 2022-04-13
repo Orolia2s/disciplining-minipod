@@ -48,12 +48,6 @@
 #define SETTLING_TIME 6
 
 /**
- * @def GLOBAL_ALPHA_DEFAULT
- * @brief Default value for Global smoothing convergence
- */
-#define GLOBAL_ALPHA_DEFAULT 0.002
-
-/**
  * @def OD_ERR_MSG_LEN
  * @brief Required size an error message buffer must have.
  */
@@ -71,8 +65,6 @@
  * @brief Minipod configuration
  */
 struct minipod_config {
-	/** Global smoothing constant */
-	float alpha_global;
 	/** Used to filter phase */
 	int ref_fluctuations_ns;
 	/** Threshold above which as phase jump is requested */
