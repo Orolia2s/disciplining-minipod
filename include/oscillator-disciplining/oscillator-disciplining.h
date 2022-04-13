@@ -229,6 +229,8 @@ enum Disciplining_State {
 	NUM_STATES
 };
 
+extern const char *status_string[NUM_STATES];
+
 /**
  * @struct od
  * @brief Opaque library context.
@@ -326,11 +328,19 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
  */
 void od_destroy(struct od **od);
 
-/**
- * @brief Returns current algorithm status
- * @param od Algorithm context.
- * @return enum Disciplining_State as an int
- */
-int od_get_status(struct od *od);
+enum ClockClass {
+	CLOCK_CLASS_UNCALIBRATED,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_HOLDOVER,
+	CLOCK_CLASS_LOCK,
+	CLOCK_CLASS_NUM
+};
+
+struct od_monitoring {
+	enum Disciplining_State status;
+	enum ClockClass clock_class;
+};
+
+int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring);
 
 #endif /* INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_ */

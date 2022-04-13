@@ -62,6 +62,24 @@ uint16_t state_windows[NUM_STATES] = {
 	WINDOW_LOCK_HIGH_RESOLUTION
 };
 
+const char *status_string[NUM_STATES] = {
+	"INIT",
+	"TRACKING",
+	"HOLDOVER",
+	"CALIBRATION",
+	"LOCK_LOW_RESOLUTION",
+	"LOCK_HIGH_RESOLUTION"
+};
+
+const enum ClockClass state_clock_class[NUM_STATES] = {
+	CLOCK_CLASS_UNCALIBRATED,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_HOLDOVER,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_LOCK
+};
+
 /**
  * @struct od
  * @brief Library context.
@@ -384,17 +402,12 @@ int od_process(struct od *od, const struct od_input *input,
 	state->od_inputs_count++;
 
 	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
-		od->state.status == INIT ? "INIT" :
-		od->state.status == TRACKING ? "TRACKING" :
-		od->state.status == HOLDOVER ? "HOLDOVER" :
-		od->state.status == CALIBRATION ? "CALIBRATION" :
-		od->state.status == LOCK_LOW_RESOLUTION ? "LOCK_LOW_RESOLUTION":
-		od->state.status == LOCK_HIGH_RESOLUTION ?"LOCK_HIGH_RESOLUTION":
-		"UNKNOWN_STATE",
+		status_string[od->state.status],
 		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		state->od_inputs_for_state,
-		input->valid ? "True" : "False", input->lock ? "True" : "False");
+		input->valid ? "True" : "False", input->lock ? "True" : "False"
+	);
 
 
 	if (state->od_inputs_count == state->od_inputs_for_state) {
@@ -520,7 +533,7 @@ int od_process(struct od *od, const struct od_input *input,
 						}
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
-							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking);
+							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking) + 1;
 					}
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
@@ -1175,8 +1188,18 @@ void od_destroy(struct od **od)
 	*od = NULL;
 }
 
-int od_get_status(struct od *od) {
-	if (od == NULL)
+int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
+	if (od == NULL || monitoring == NULL)
 		return -1;
-	return od->state.status;
+
+	if (od->minipod_config.tracking_only) {
+		monitoring->clock_class = state_clock_class[od->state.status];
+		monitoring->status = od->state.status;
+		if (od->state.current_phase_convergence_count > round(6.0 / od->state.alpha_es_tracking))
+			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
+	} else {
+		monitoring->clock_class = state_clock_class[od->state.status];
+		monitoring->status = od->state.status;
+	}
+	return 0;
 }
