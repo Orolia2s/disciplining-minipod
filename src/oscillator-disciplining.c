@@ -737,6 +737,14 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
+					if ((abs(delta_fine) > 1) &&
+						(frequency_error * state->previous_freq_error < 0)
+					) {
+						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+						delta_fine = round(0.5*delta_fine);
+					}
+					state->previous_freq_error = frequency_error;
+
 					/* Compensate phase error */
 					float frequency_error_pcorr = 0.0;
 					int16_t delta_fine_pcorr = 0;
@@ -756,18 +764,6 @@ int od_process(struct od *od, const struct od_input *input,
 							-LOCK_LOW_RES_FINE_DELTA_MAX :
 							LOCK_LOW_RES_FINE_DELTA_MAX;
 					}
-
-					if ((abs(delta_fine) > 0) &&
-						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
-						(fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
-						(frequency_error * state->previous_freq_error < 0) &&
-						(fabs(mean_phase_error) < config->ref_fluctuations_ns)
-
-					) {
-						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine" , state->previous_freq_error, frequency_error);
-						delta_fine = round(0.5*delta_fine);
-					}
-					state->previous_freq_error = frequency_error;
 
 					uint16_t new_fine;
 					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
@@ -927,6 +923,14 @@ int od_process(struct od *od, const struct od_input *input,
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
 
+					if ((abs(delta_fine) > 1) &&
+						(frequency_error * state->previous_freq_error < 0)
+					) {
+						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+						delta_fine = round(0.5*delta_fine);
+					}
+					state->previous_freq_error = frequency_error;
+
 					/* Compensate phase error */
 					float frequency_error_pcorr = 0.0;
 					int16_t delta_fine_pcorr = 0;
@@ -946,18 +950,6 @@ int od_process(struct od *od, const struct od_input *input,
 							-LOCK_HIGH_RES_FINE_DELTA_MAX :
 							LOCK_HIGH_RES_FINE_DELTA_MAX;
 					}
-
-					if ((abs(delta_fine) > 0) &&
-						(fabs(state->previous_freq_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
-						(fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) &&
-						(frequency_error * state->previous_freq_error < 0) &&
-						(fabs(mean_phase_error) < config->ref_fluctuations_ns)
-
-					) {
-						log_debug("frequency sign change since last cycle (%f, %f), 0.5*delta_fine" , state->previous_freq_error, frequency_error);
-						delta_fine = round(0.5*delta_fine);
-					}
-					state->previous_freq_error = frequency_error;
 
 					uint16_t new_fine;
 					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
