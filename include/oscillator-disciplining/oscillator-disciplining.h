@@ -71,8 +71,6 @@
  * @brief Minipod configuration
  */
 struct minipod_config {
-	/** Global smoothing constant */
-	float alpha_global;
 	/** Used to filter phase */
 	int ref_fluctuations_ns;
 	/** Threshold above which as phase jump is requested */

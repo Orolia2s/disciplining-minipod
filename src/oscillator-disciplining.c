@@ -196,7 +196,7 @@ static int init_algorithm_state(struct od * od) {
 	state->alpha_es_tracking = 0.01;
 	state->alpha_es_lock_low_res = 0.05;
 	state->alpha_es_lock_high_res = 0.25;
-
+	
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
 	if (!state->inputs) {
