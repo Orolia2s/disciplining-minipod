@@ -98,6 +98,7 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 	state->od_inputs_for_state = state_windows[new_state];
 	state->od_inputs_count = 0;
 	state->current_phase_convergence_count = 0;
+	state->state_start_time = time(NULL);
 }
 
 static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
@@ -209,6 +210,7 @@ static int init_algorithm_state(struct od * od) {
 	state->estimated_drift = 0;
 	state->current_phase_convergence_count = 0;
 	state->previous_freq_error = 0.0;
+	state->state_start_time = 0;
 
 	/* Init Alpha Equilibrium smooth */
 	state->alpha_es_tracking = 0.01;
@@ -486,6 +488,7 @@ int od_process(struct od *od, const struct od_input *input,
 			* We wait for one cycle to start disciplining again
 			*/
 			case HOLDOVER:
+				/* TODO: Condition state switch to state->start_start_time */
 				set_state(state, TRACKING);
 				set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
@@ -1010,7 +1013,8 @@ int od_process(struct od *od, const struct od_input *input,
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
-			set_state(state, HOLDOVER);
+			if (state->status != HOLDOVER)
+				set_state(state, HOLDOVER);
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
@@ -1201,5 +1205,10 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 		monitoring->clock_class = state_clock_class[od->state.status];
 		monitoring->status = od->state.status;
 	}
+
+	/* TODO:
+	if time(NULL) state->state_start_time > 86400sec && state->status == HOLDOVER
+		monitoring->clock_class = CLOCK_CLASS_UNCALIBRATED;
+	*/
 	return 0;
 }
