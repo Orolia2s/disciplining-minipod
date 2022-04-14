@@ -40,6 +40,10 @@
 struct linear_func_param {
 	double a;
 	double b;
+	double a_std;
+	double b_std;
+	double R2;
+	double t0;
 };
 
 /**

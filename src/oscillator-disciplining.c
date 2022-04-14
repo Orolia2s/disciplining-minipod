@@ -39,28 +39,46 @@
 
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
-#include "parameters.h"
-#include "utils.h"
 #include "algorithm_structs.h"
+#include "checks.h"
 #include "log.h"
+#include "parameters.h"
+#include "phase.h"
+#include "utils.h"
 
-/** mRO base fine step sensitivity */
-#define MRO_FINE_STEP_SENSITIVITY -3.E-12
-/** mRO base coarse step sensitivity */
-#define MRO_COARSE_STEP_SENSITIVITY 1.24E-9
+#define SETTLING_TIME_MRO50 6
+#define WINDOW_TRACKING 6
+#define WINDOW_LOCK_LOW_RESOLUTION 66
+#define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 1000
+#define WINDOW_LOCK_HIGH_RESOLUTION 606
+#define LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 3000
 
-/** Minimum possible value of coarse control */
-#define COARSE_RANGE_MIN 0
-/** Maximum possible value of coarse control */
-#define COARSE_RANGE_MAX 4194303
-/** Minimum possible value of fine control */
-#define FINE_RANGE_MIN 1600
-/** Maximum possible value of fine control */
-#define FINE_RANGE_MAX 3200
-/** Smooth exponential factor for estimated equilibrium
- * used during holdover phase
- */
-#define ALPHA_ES 0.01
+uint16_t state_windows[NUM_STATES] = {
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_TRACKING,
+	WINDOW_LOCK_LOW_RESOLUTION,
+	WINDOW_LOCK_HIGH_RESOLUTION
+};
+
+const char *status_string[NUM_STATES] = {
+	"INIT",
+	"TRACKING",
+	"HOLDOVER",
+	"CALIBRATION",
+	"LOCK_LOW_RESOLUTION",
+	"LOCK_HIGH_RESOLUTION"
+};
+
+const enum ClockClass state_clock_class[NUM_STATES] = {
+	CLOCK_CLASS_UNCALIBRATED,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_HOLDOVER,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_LOCK
+};
 
 /**
  * @struct od
@@ -74,8 +92,25 @@ struct od {
 	struct disciplining_parameters dsc_parameters;
 };
 
+static void set_state(struct algorithm_state *state, enum Disciplining_State new_state)
+{
+	state->status = new_state;
+	state->od_inputs_for_state = state_windows[new_state];
+	state->od_inputs_count = 0;
+	state->current_phase_convergence_count = 0;
+}
+
+static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
+{
+	output->action = action;
+	output->setpoint = setpoint;
+	output->value_phase_ctrl = value_phase_ctrl;
+	return;
+}
+
 static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, float *drift_coeffs, uint8_t length) {
 	uint16_t diff_fine;
+	int i;
 
 	/*
 	* Init ctrl_points, which have the same size as
@@ -93,7 +128,7 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
 	log_debug("Control points used:");
-	for (int i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		state->ctrl_points[i] = (float) state->ctrl_range_fine[0] + load_nodes[i] * diff_fine;
 		state->ctrl_drift_coeffs[i] = drift_coeffs[i];
 		log_debug("\t%d: %f -> %f", i, state->ctrl_points[i], state->ctrl_drift_coeffs[i]);
@@ -102,34 +137,90 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 	return 0;
 }
 
+static int compute_fine_value(struct algorithm_state *state, float react_coeff, uint16_t *fine_ctrl_value)
+{
+	float interpolation_value;
+	int ret;
+	ret = lin_interp(
+		state->ctrl_points,
+		state->ctrl_drift_coeffs,
+		state->ctrl_points_length,
+		Y_INTERPOLATION,
+		react_coeff,
+		&interpolation_value
+	);
+	if (ret < 0)
+	{
+		log_error("Error occured in lin_interp: %d", ret);
+		return -1;
+	}
+	/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
+	if (interpolation_value <= 0.0) {
+		log_warn("fine control value found is negative (%f), setting to 0.0", interpolation_value);
+		interpolation_value = 0.0;
+	}
+
+	*fine_ctrl_value = (uint16_t) round(interpolation_value);
+	return 0;
+}
+
+static void print_inputs(struct algorithm_input *inputs, int length)
+{
+	int i;
+	if (!inputs || length <= 0)
+		return;
+	char * str = calloc((length + 2) * 16, sizeof(char));
+	strcat(str, "Inputs: [");
+	for (i = 0; i < length; i++) {
+		char float_num[14];
+		sprintf(float_num, "%.3f", inputs[i].phase_error);
+		strcat(str, float_num);
+		if (i < length -1)
+		strcat(str, ", ");
+	}
+	strcat(str, "]");
+	log_info(str);
+	free(str);
+	str = NULL;
+}
+
 static int init_algorithm_state(struct od * od) {
 	int ret;
-	float interpolation_value;
 
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
 	struct minipod_config *config = &od->minipod_config;
 
 	/* Init state variables */
+	set_state(state, INIT);
+	state->calib = false;
+
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
-	state->invalid_ctrl = false;
-	state->calib = false;
-	state->status = INIT;
+
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
 	state->ctrl_range_coarse[1] = COARSE_RANGE_MAX;
-	state->ctrl_range_fine[0] = FINE_RANGE_MIN;
-	state->ctrl_range_fine[1] = FINE_RANGE_MAX;
-	state->fine_mid = (uint16_t) (0.5 * (FINE_RANGE_MIN + FINE_RANGE_MAX));
-	state->estimated_drift = 0;
+	state->ctrl_range_fine[0] = FINE_MID_RANGE_MIN;
+	state->ctrl_range_fine[1] = FINE_MID_RANGE_MAX;
+
+	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
 	state->fine_ctrl_value = 0;
 
-	/* Kalman filter parameters */
-	state->kalman.Ksigma = config->ref_fluctuations_ns;
-	state->kalman.Kphase = 0.0;
-	state->kalman.q = 1.0;
-	state->kalman.r = 5.0;
-	state->kalman.Kphase_set = false;
+	state->estimated_drift = 0;
+	state->current_phase_convergence_count = 0;
+	state->previous_freq_error = 0.0;
+
+	/* Init Alpha Equilibrium smooth */
+	state->alpha_es_tracking = 0.01;
+	state->alpha_es_lock_low_res = 0.05;
+	state->alpha_es_lock_high_res = 0.25;
+	
+	/* Allocate memory for algorithm inputs */
+	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
+	if (!state->inputs) {
+		log_error("Could not allocate memory for algorithm inputs !");
+		return -1;
+	}
 
 	/*
 	 * Check wether nominal parameters should be used or factory ones
@@ -157,23 +248,16 @@ static int init_algorithm_state(struct od * od) {
 	if (ret != 0)
 		return ret;
 
-	ret = lin_interp(
-		state->ctrl_points,
-		state->ctrl_drift_coeffs,
-		state->ctrl_points_length,
-		Y_INTERPOLATION,
-		0,
-		&interpolation_value
-	);
-
-	if (ret < 0) {
-		log_error("Error occured during lin_interp, err %d", -ret);
+	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
+	if (ret != 0) {
+		log_error("Error computing fine value from control drift coefficients");
 		return ret;
 	}
-	state->estimated_equilibrium = (uint32_t) interpolation_value;
-	log_info("Initialization: Estimated equilibirum is %d", state->estimated_equilibrium);
-	state->estimated_equilibrium_ES = state->estimated_equilibrium;
-
+	if (dsc_parameters->estimated_equilibrium_ES != 0)
+		state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+	else
+		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
 	return 0;
 }
 
@@ -186,12 +270,36 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 	struct algorithm_state *state = &(od->state);
 	struct minipod_config *config = &(od->minipod_config);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
+	int i;
+
 	log_debug("Control Check mRO:");
+	/* Check estimated equilibrium is in tolerance range */
 	if (state->calib
 		&& state->estimated_equilibrium >= (uint32_t) state->ctrl_range_fine[0] + config->fine_stop_tolerance
 		&& state->estimated_equilibrium <= (uint32_t) state->ctrl_range_fine[1] - config->fine_stop_tolerance
+		&& state->ctrl_drift_coeffs[0] >= 0.0 && state->ctrl_drift_coeffs[state->ctrl_points_length - 1] <= 0.0
 	) {
 		log_info("Estimated equilibrium is in tolerance range, saving calibration in config file");
+		for(i = 0; i < state->ctrl_points_length - 2; i++) {
+			if (state->ctrl_drift_coeffs[i] < state->ctrl_drift_coeffs[i+1]) {
+				log_debug("ctrl_drift_coeffs[%d] = %f is greater than ctrl_drift_coeffs[%d] = %f",
+					i, state->ctrl_drift_coeffs[i], i + 1, state->ctrl_drift_coeffs[i+1]);
+				log_warn("Calibration coefficients are not descending with fine values");
+				set_output(output, CALIBRATE, 0, 0);
+				return false;
+			}
+		}
+		log_debug("Calibration coefficients are descending with fine values");
+		for(i = 0; i < state->ctrl_points_length; i++) {
+			if (fabs(state->ctrl_drift_coeffs[i]) > DRIFT_COEFFICIENT_ABSOLUTE_MAX) {
+				log_warn("ctrl_drift_coeffs[%d] coefficient is greater than %f in absolute: %f",
+					i, DRIFT_COEFFICIENT_ABSOLUTE_MAX, state->ctrl_drift_coeffs[i]);
+				set_output(output, CALIBRATE, 0, 0);
+				return false;
+			}
+		}
+		log_debug("All coefficients are inferior to %f in absolute value", DRIFT_COEFFICIENT_ABSOLUTE_MAX);
+
 		dsc_parameters->coarse_equilibrium = input->coarse_setpoint;
 		dsc_parameters->calibration_valid = true;
 		return true;
@@ -212,14 +320,12 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 				-config->max_allowed_coarse;
 		}
 
-		output->setpoint = input->coarse_setpoint + delta_coarse;
-		output->action = ADJUST_COARSE;
-		output->value_phase_ctrl = 0;
+		set_output(output, ADJUST_FINE, input->coarse_setpoint + delta_coarse, 0);
 		log_info("Requesting a coarse alignement to value %d", output->setpoint);
 		return false;
 	} else {
 		/* mRO needs to be calibrated */
-		output->action = CALIBRATE;
+		set_output(output, CALIBRATE, 0, 0);
 		return false;
 	}
 }
@@ -229,31 +335,11 @@ static float get_reactivity(float phase_ns, int sigma, int min, int max, int pow
 	return r > min ? r : min;
 }
 
-static float filter_phase(struct kalman_parameters *kalman, float phase, int interval, float estimated_drift) {
-	/* Init Kalman phase */
-	if (!kalman->Kphase_set) {
-		kalman->Kphase = phase;
-		kalman->Kphase_set = true;
-	}
-
-	/* Predict */
-	kalman->Kphase += interval * estimated_drift;
-	log_debug("kalman->Kphase += interval * estimated_drift = %f", kalman->Kphase);
-	kalman->Ksigma += kalman->q;
-
-	/* Square computing to do it once */
-	float square_Ksigma = pow(kalman->Ksigma, 2);
-	float square_r = pow(kalman->r, 2);
-
-	/* Update */
-	float gain = square_Ksigma / (square_Ksigma + square_r);
-	float innovation = (phase - kalman->Kphase);
-	kalman->Kphase = kalman->Kphase + gain * innovation;
-	kalman->Ksigma = sqrt((square_r * square_Ksigma)
-		/ (square_r + square_Ksigma)
-	);
-
-	return kalman->Kphase;
+static void add_input_to_algorithm(struct algorithm_input *algorithm_input, const struct od_input *input)
+{
+	algorithm_input->phase_error = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
+	algorithm_input->valid = input->valid;
+	algorithm_input->lock = input->lock;
 }
 
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *disciplining_config, char err_msg[OD_ERR_MSG_LEN])
@@ -304,193 +390,631 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
-	log_debug("OD_PROCESS: State is %d, gnss valid is %d and mRO lock is %d",
-		od->state.status, input->valid, input->lock);
+	set_output(output, NO_OP, 0, 0);
 
-	if (input->valid && input->lock)
-	{
-		if (od->state.status != CALIBRATION
-			&& (
-				config->calibrate_first
-				|| input->calibration_requested
+	/* Add new algorithm input */
+	add_input_to_algorithm(&state->inputs[state->od_inputs_count], input);
+	log_debug("input: phase_error: %d, qErr: %d", input->phase_error.tv_nsec,input->qErr);
+	log_debug("INPUT[%d] = %f",
+		state->od_inputs_count,
+		state->inputs[state->od_inputs_count].phase_error
+	);
+	state->od_inputs_count++;
+
+	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
+		status_string[od->state.status],
+		state->current_phase_convergence_count,
+		state->od_inputs_count,
+		state->od_inputs_for_state,
+		input->valid ? "True" : "False", input->lock ? "True" : "False"
+	);
+
+
+	if (state->od_inputs_count == state->od_inputs_for_state) {
+		state->od_inputs_count = 0;
+		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
+		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
+		if (gnss_state == GNSS_OK && mro50_lock_state)
+		{
+			if (od->state.status != CALIBRATION
+				&& (
+					config->calibrate_first
+					|| input->calibration_requested
+				)
 			)
-		)
-		{
-			config->calibrate_first = false;
-			output->action = CALIBRATE;
-			od->state.status = CALIBRATION;
-			return 0;
-		}
-		/** Invalid control value, need to check mRO control values
-		 * If calibration has been done, we need to make a control check of the mRO
-		 */
-		if (state->invalid_ctrl || state->status == CALIBRATION)
-		{
-			if(!control_check_mRO(od, input, output))
 			{
-				/* Control check has not been passed.
-				* Either a Coarse alignement or a calibration process
-				* has been decided and prepared in output
-				*/
-				state->calib = false;
-				log_debug("Control_check_mro has not been passed !");
+				config->calibrate_first = false;
+				set_output(output, CALIBRATE, 0, 0);
+				/* FIXME !*/
+				od->state.status = CALIBRATION;
 				return 0;
-			}
-			log_debug("Control check mRO has been passed !");
-			state->calib = false;
-			state->status = INIT;
-
-			/* Request coarse value to be saved in mRO50 memory */
-			output->action = SAVE_DISCIPLINING_PARAMETERS;
-			return 0;
-		}
-
-		/* Initialization */
-		if (state->status == INIT)
-		{
-			if (config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium_factory;
-				log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else if (!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium >= 0 && input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
-				output->action = ADJUST_COARSE;
-				output->setpoint = dsc_parameters->coarse_equilibrium;
-				log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-			} else {
-				if (dsc_parameters->coarse_equilibrium < 0)
-					log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
-						"consider calibration if disciplining is not efficient");
-				output->action = ADJUST_FINE;
-				output->setpoint = state->estimated_equilibrium;
-				state->status = PHASE_ADJUSTMENT;
-				log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 
 			}
-			return 0;
-		}
-		/* Holdover and valid flag switched to valid,
-		 * We wait for one cycle to start disciplining again
-		 */
-		else if (state->status == HOLDOVER)
-		{
-			state->status = PHASE_ADJUSTMENT;
-			output->action = ADJUST_FINE;
-			output->setpoint = state->estimated_equilibrium;
-			log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
-		}
-		else
-		{
-			if (labs(input->phase_error.tv_nsec) < config->phase_jump_threshold_ns)
-			{
-				/* Call Main loop */
-				float phase = input->phase_error.tv_nsec;
-				float filtered_phase = filter_phase(
-					&(state->kalman),
-					phase,
-					SETTLING_TIME,
-					state->estimated_drift
-				);
-				float innovation = phase - filtered_phase;
-				log_info("Filtered phase is %f", filtered_phase);
 
-				float x;
-				if (fabs(phase) <= config->ref_fluctuations_ns
-					&& fabs(innovation) <= config->ref_fluctuations_ns)
-					x = filtered_phase;
-				else
-					x = phase;
-
-				if (fabs(x) < config->ref_fluctuations_ns
-					&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					&& state->fine_ctrl_value <= state->ctrl_range_fine[1]))
+			float mean_phase_error;
+			switch(state->status) {
+			/* Calibration: calibration data is available and control check must be done */
+			case CALIBRATION:
+				/** Need to check mRO control values
+				 * If calibration has been done, we need to make a control check of the mRO
+				 */
+				if(!control_check_mRO(od, input, output))
 				{
-					state->estimated_equilibrium_ES =
-						round((ALPHA_ES * state->fine_ctrl_value
-						+ (1.0 - ALPHA_ES) * state->estimated_equilibrium_ES));
-					log_info("Estimated equilibrium with exponential smooth is %d",
-						state->estimated_equilibrium_ES);
+					/* Control check has not been passed.
+					* Either a Coarse alignement or a calibration process
+					* has been decided and prepared in output
+					*/
+					state->calib = false;
+					log_debug("Control_check_mro has not been passed !");
+					return 0;
 				}
+				log_debug("Control check mRO has been passed !");
+				state->calib = false;
+				set_state(state, INIT);
 
-				float r = get_reactivity(
-					fabs(x),
-					config->ref_fluctuations_ns,
-					config->reactivity_min,
-					config->reactivity_max,
-					config->reactivity_power
-				);
-				float react_coeff = - x / r;
-				log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
+				/* Request coarse value to be saved in mRO50 memory */
+				set_output(output, SAVE_DISCIPLINING_PARAMETERS, 0, 0);
+				return 0;
+				break;
 
-				float interp_value;
-
-				ret = lin_interp(
-					state->ctrl_points,
-					state->ctrl_drift_coeffs,
-					state->ctrl_points_length,
-					Y_INTERPOLATION,
-					react_coeff,
-					&interp_value
-				);
-				if (ret < 0)
+			/* Initialization */
+			case INIT:
+				if (config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium_factory >= 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory)
 				{
-					log_error("Error occured in lin_interp: %d", ret);
-					return -1;
+					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
+					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else if (!config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium >= 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium)
+				{
+					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
+					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				} else {
+					if (dsc_parameters->coarse_equilibrium < 0)
+						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
+							"consider calibration if disciplining is not efficient");
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					set_state(state, TRACKING);
+					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
 				}
+				return 0;
+				break;
 
-				state->fine_ctrl_value = (uint16_t) round(interp_value);
+			/* Holdover and valid flag switched to valid,
+			* We wait for one cycle to start disciplining again
+			*/
+			case HOLDOVER:
+				set_state(state, TRACKING);
+				set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
+				break;
 
-				if (state->fine_ctrl_value >= state->ctrl_range_fine[0]
-					&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
-				{
-					state->estimated_drift = react_coeff;
-					output->action = ADJUST_FINE;
-					output->setpoint = state->fine_ctrl_value;
+			case TRACKING:
+				print_inputs(state->inputs, WINDOW_TRACKING);
+				/* Compute mean phase error over cycle */
+				ret = compute_phase_error_mean(state->inputs, state->od_inputs_for_state, &mean_phase_error);
+				if (ret != 0) {
+					log_error("Mean phase error could be computed");
+					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
 				}
-				else
+				/* Check phase error is below threshold configured */
+				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
-					log_warn("Control value is out of range, if convergence is not reached"
-						" consider recalibration or other reactivity parameters");
-
-					float stop_value;
-
-					if (state->fine_ctrl_value < state->ctrl_range_fine[0])
-						stop_value = state->ctrl_range_fine[0];
-					else
-						stop_value = state->ctrl_range_fine[1];
-
-					ret = lin_interp(
-						state->ctrl_points,
-						state->ctrl_drift_coeffs,
-						state->ctrl_points_length,
-						X_INTERPOLATION,
-						stop_value,
-						&state->estimated_drift
-					);
-					log_info("Estimated drift is now %f", state->estimated_drift);
-
-					if (ret < 0)
+					/* Call Main loop */
+					if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+						mean_phase_error, config->ref_fluctuations_ns))
 					{
-						log_error("Error occured in lin_interp: %d", ret);
-						return -1;
+						log_warn("Outlier detected ! entering holdover");
+						set_state(state, HOLDOVER);
+						set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
+						return 0;
 					}
 
-					output->action = ADJUST_FINE;
-					output->setpoint = stop_value;
+					/* Phase error is below reference and control value in midrange */
+					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
+						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
+						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
+						&& fabs(state->inputs[WINDOW_TRACKING].phase_error - state->inputs[0].phase_error)
+						< (float) config->ref_fluctuations_ns)
+					{
+						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
+							log_debug("fast smoothing convergence : 2.0 * %f applied", state->alpha_es_tracking);
+							state->estimated_equilibrium_ES =
+								(2.0 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
+						} else {
+							state->estimated_equilibrium_ES =
+								(state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES);
+						}
+						state->current_phase_convergence_count++;
+						if (state->current_phase_convergence_count  == UINT16_MAX)
+							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking) + 1;
+					}
+					log_info("Estimated equilibrium with exponential smooth is %f",
+						state->estimated_equilibrium_ES);
+					log_debug("convergence_count: %d", state->current_phase_convergence_count);
+
+					float r = get_reactivity(
+						fabs(mean_phase_error),
+						config->ref_fluctuations_ns,
+						config->reactivity_min,
+						config->reactivity_max,
+						config->reactivity_power
+					);
+					float react_coeff = - mean_phase_error / r;
+					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
+
+					ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
+					if (ret != 0) {
+						log_error("Error computing fine value");
+						return ret;
+					}
+					log_debug("New fine control value: %u", state->fine_ctrl_value);
+
+					/* If fine estimated equilibrium ES is in tolerance range */
+					if ((uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance &&
+						(uint32_t) round(state->estimated_equilibrium_ES) <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+					{
+						if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)) {
+							/* Update estimated equilibrium ES in discplining parameters */
+							od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+							/* Smooth convergence reached, adjust to estimated equilibrium smooth */
+							log_info("Smoothing convergence reached");
+							state->estimated_drift = react_coeff;
+
+							/* Switch to LOCK_LOW_RESOLUTION_STATE if tracking_only is disabled */
+							if (!config->tracking_only) {
+								set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+								set_state(state, LOCK_LOW_RESOLUTION);
+								return 0;
+							}
+						}
+					} else {
+						/* Check if we did more that 2 convergence count threshold */
+						if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
+							log_warn("Estimated equilibrium is out of range !");
+							uint32_t new_coarse = input->coarse_setpoint;
+							if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint + 1;
+							else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint - 1;
+							log_info("Adjusting coarse value to %u", new_coarse);
+							set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+							/* Reset Tracking state */
+							set_state(state, TRACKING);
+
+							/* Update estimated equilibrium ES to initial guess */
+							if (dsc_parameters->estimated_equilibrium_ES != 0)
+								state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+							else
+								state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+
+							if (config->oscillator_factory_settings)
+								dsc_parameters->coarse_equilibrium_factory = new_coarse;
+							else
+								dsc_parameters->coarse_equilibrium = new_coarse;
+							return 0;
+						}
+					}
+
+					/* current_phase_convergence_count is below current_phase_convergence_count_threshold*/
+					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
+						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
+					{
+						state->estimated_drift = react_coeff;
+						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
+					}
+					else
+					{
+						log_warn("Control value is out of range, if convergence is not reached"
+							" consider recalibration or other reactivity parameters");
+
+						float stop_value;
+
+						if (state->fine_ctrl_value < FINE_RANGE_MIN + config->fine_stop_tolerance)
+							stop_value = FINE_RANGE_MIN + config->fine_stop_tolerance;
+						else
+							stop_value = FINE_RANGE_MAX - config->fine_stop_tolerance;
+
+						ret = lin_interp(
+							state->ctrl_points,
+							state->ctrl_drift_coeffs,
+							state->ctrl_points_length,
+							X_INTERPOLATION,
+							stop_value,
+							&state->estimated_drift
+						);
+						log_info("Estimated drift is now %f", state->estimated_drift);
+
+						if (ret < 0)
+						{
+							log_error("Error occured in lin_interp: %d", ret);
+							return -1;
+						}
+						set_output(output, ADJUST_FINE, stop_value, 0);
+					}
+					return 0;
+				} else {
+					if (state->current_phase_convergence_count <= round(6.0 / state->alpha_es_tracking)) {
+						/* Phase jump needed */
+						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
+					} else {
+						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					}
+					return 0;
 				}
-				return 0;
-			} else {
-				/* Phase jump needed */
-				output->action = PHASE_JUMP;
-				output->value_phase_ctrl = input->phase_error.tv_nsec;
-				return 0;
+				break;
+			case LOCK_LOW_RESOLUTION:
+			{
+				state->current_phase_convergence_count++;
+				log_debug("convergence_count: %d", state->current_phase_convergence_count);
+				if (state->current_phase_convergence_count  == UINT16_MAX)
+					state->current_phase_convergence_count = round(6.0 / state->alpha_es_lock_low_res);
+				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50);
+
+				/* Check that estimated equilibrium is within acceptable range */
+				if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					(uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+					log_warn("Estimated equilibrium is out of range !");
+					uint32_t new_coarse = input->coarse_setpoint;
+					if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint + 1;
+					else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint - 1;
+					log_info("Adjusting coarse value to %u", new_coarse);
+					set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+					/* Switch to Tracking state */
+					set_state(state, TRACKING);
+
+					/* Update estimated equilibrium ES to initial guess*/
+					if (dsc_parameters->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+					else
+						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+
+					if (config->oscillator_factory_settings)
+						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+					else
+						dsc_parameters->coarse_equilibrium = new_coarse;
+					return 0;
+				}
+
+
+				/* Compute mean phase error over cycle */
+				ret = compute_phase_error_mean(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50,
+					&mean_phase_error
+				);
+				if (ret != 0) {
+					log_error("Mean phase error could not be computed");
+					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) && mean_phase_error > 2 * config->ref_fluctuations_ns) {
+					set_state(state, TRACKING);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				/* Compute frequency error */
+				struct linear_func_param func;
+				ret = compute_frequency_error(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_LOW_RESOLUTION - SETTLING_TIME_MRO50,
+					&func
+				);
+				if (ret != 0) {
+					log_error("Error computing frequency_error and standard deviation");
+				}
+
+				double R2 = func.R2;
+				double t0 = func.t0;
+				double frequency_error = func.a;
+				double frequency_error_std = func.a_std;
+				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
+				// t-test threshold for 99% confidence level null slope with 60-2 degrees of freedom
+				// must be changed if lock windows size changes or used from a table
+				float t9995_ndf58 = 3.467;
+
+				if ((R2 > R2_THRESHOLD_LOW_RESOLUTION) || (t0 < t9995_ndf58)) {
+					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
+					if (fabs(frequency_error) > LOCK_LOW_RES_FREQUENCY_ERROR_MAX) {
+						log_warn("Strong drift detected");
+
+						/* We authorize such strong drift at first step of the phase */
+						if (state->current_phase_convergence_count > 1
+							&& state->current_phase_convergence_count < round(6.0 / state->alpha_es_lock_low_res)) {
+							log_warn("Applying estimated equilibrium");
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+							return 0;
+						}
+					}
+
+					float coeff = 0.0;
+					/* Compensate pure frequency error only */
+					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))){
+						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
+						coeff = coeff > 0.9 ? 0.9 : coeff;
+					}
+					log_debug("Pure frequency coefficients: %f", coeff);
+					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+
+					if (((abs(delta_fine) > 1) && (frequency_error * state->previous_freq_error < 0)) || (t0 < t9995_ndf58)) {
+						log_debug("frequency sign change since last cycle (%f, %f), or flat slope. 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+						delta_fine = round(0.5*delta_fine);
+					}
+					state->previous_freq_error = frequency_error;
+
+					/* Compensate phase error */
+					float frequency_error_pcorr = 0.0;
+					int16_t delta_fine_pcorr = 0;
+					if (fabs(mean_phase_error) >= 0.6*config->ref_fluctuations_ns) {
+						frequency_error_pcorr = - mean_phase_error / (LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
+						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9)); // check sign !!
+					}
+					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
+
+					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
+					delta_fine += delta_fine_pcorr;
+					log_debug("Sum delta fine: %d", delta_fine);
+
+					if (abs(delta_fine) > LOCK_LOW_RES_FINE_DELTA_MAX) {
+						delta_fine = delta_fine < 0 ?
+							-LOCK_LOW_RES_FINE_DELTA_MAX :
+							LOCK_LOW_RES_FINE_DELTA_MAX;
+					}
+
+					uint16_t new_fine;
+					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
+						new_fine = FINE_MID_RANGE_MIN;
+					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX)
+						new_fine = FINE_MID_RANGE_MAX;
+					else
+						new_fine = input->fine_setpoint + delta_fine;
+					log_debug("NEW FINE value: %u", new_fine);
+
+					uint16_t new_fine_from_calib;
+					ret = compute_fine_value(state, coeff*frequency_error, &new_fine_from_calib);
+					if (ret != 0) {
+						log_error("Could not compute fine value for log");
+					} else {
+						log_debug("new_fine_from_calib: %u", new_fine_from_calib);
+					}
+
+					/* Apply computed fine  */
+					set_output(output, ADJUST_FINE, new_fine, 0);
+					/* Update estimated equilibrium */
+					state->estimated_equilibrium_ES =
+						(state->alpha_es_lock_low_res * (new_fine - delta_fine_pcorr)
+						+ (1.0 - state->alpha_es_lock_low_res) * state->estimated_equilibrium_ES);
+					log_info("Estimated equilibrium with exponential smooth is %f",
+						state->estimated_equilibrium_ES);
+					/* Update estimated equilibrium ES in discplining parameters */
+					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+
+					/* Check wether high resolution has been reached */
+					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
+						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)) &&
+						state->current_phase_convergence_count > round(6.0 / state->alpha_es_lock_low_res) &&
+						fabs(mean_phase_error) < 1.5 * config->ref_fluctuations_ns)
+					{
+						log_info("Low frequency error reached, entering LOCK_HIGH_RESOLUTION");
+						set_state(state, LOCK_HIGH_RESOLUTION);
+						return 0;
+					}
+
+					if (state->current_phase_convergence_count > 5 * round(6.0 / state->alpha_es_lock_low_res)) {
+						log_warn("No high resolution convergence reached after %d cycles", state->current_phase_convergence_count);
+					}
+
+				} else {
+					log_warn("Low linear fit quality, applying estimated equilibrium");
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+				}
+				break;
 			}
+			case LOCK_HIGH_RESOLUTION:
+			{   
+				state->current_phase_convergence_count++;
+				log_debug("convergence_count: %d", state->current_phase_convergence_count);
+				if (state->current_phase_convergence_count  == UINT16_MAX)
+					state->current_phase_convergence_count = round(6.0 / state->alpha_es_lock_high_res);
+				print_inputs(&(state->inputs[SETTLING_TIME_MRO50]), WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50);
+
+				/* Check that estimated equilibrium is within acceptable range */
+				if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance ||
+					(uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+					log_warn("Estimated equilibrium is out of range !");
+					uint32_t new_coarse = input->coarse_setpoint;
+					if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint + 1;
+					else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+						new_coarse = input->coarse_setpoint - 1;
+					log_info("Adjusting coarse value to %u", new_coarse);
+					set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+					/* Switch to Tracking state */
+					set_state(state, TRACKING);
+
+					/* Update estimated equilibrium ES to initial guess*/
+					if (dsc_parameters->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+					else
+						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+
+					if (config->oscillator_factory_settings)
+						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+					else
+						dsc_parameters->coarse_equilibrium = new_coarse;
+					return 0;
+				}
+
+				/* Compute mean phase error over cycle */
+				ret = compute_phase_error_mean(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50,
+					&mean_phase_error
+				);
+				if (ret != 0) {
+					log_error("Mean phase error could not be computed");
+					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! Adjust to equilibrium");
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				if (fabs(mean_phase_error) > 2.5 * config->ref_fluctuations_ns) {
+					log_warn("Mean phase error too high, going back into Lock Low Resolution");
+					set_state(state, LOCK_LOW_RESOLUTION);
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
+				/* Compute frequency error */
+				struct linear_func_param func;
+				ret = compute_frequency_error(
+					&(state->inputs[SETTLING_TIME_MRO50]),
+					WINDOW_LOCK_HIGH_RESOLUTION - SETTLING_TIME_MRO50,
+					&func
+				);
+				if (ret != 0) {
+					log_error("Error computing frequency_error and standard deviation");
+					/* FIXME */
+				}
+
+				double R2 = func.R2;
+				double t0 = func.t0;
+				double frequency_error = func.a;
+				double frequency_error_std = func.a_std;
+				log_debug("Frequency Error: %f, STD: %f, R2: %f, t0: %f", frequency_error, frequency_error_std, R2, t0);
+				// t-test threshold for 99% confidence level null slope with 600-2 degrees of freedom
+				// must be changed if lock windows size changes or used from a table
+				float t995_ndf598 = 3.39;
+
+				if ((R2 > R2_THRESHOLD_HIGH_RESOLUTION) || (t0 < t995_ndf598)) {
+					log_debug("Current frequency estimate is %f +/- %f", frequency_error, frequency_error_std);
+
+					if (fabs(frequency_error) > LOCK_HIGH_RES_FREQUENCY_ERROR_MAX) {
+						log_warn("Strong drift detected");
+
+						/* We authorize such strong drift at first step of the phase */
+						if (state->current_phase_convergence_count > 1) {
+							/* TODO: More elaborate exit conditions depending on mean phase error*/
+							log_warn("Applying estimated equilibrium");
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+							return 0;
+						}
+					}
+
+					float coeff = 0.0;
+					/* Compensate pure frequency error only */
+					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
+						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
+						coeff = coeff > 0.9 ? 0.9 : coeff;
+					}
+					log_debug("Pure frequency coefficients: %f", coeff);
+					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+
+					if (((abs(delta_fine) > 1) && (frequency_error * state->previous_freq_error < 0)) || (t0 < t995_ndf598)) {
+						log_debug("frequency sign change since last cycle (%f, %f), or flat slope. 0.5*delta_fine for pure frequency" , state->previous_freq_error, frequency_error);
+						delta_fine = round(0.5*delta_fine);
+					}
+					state->previous_freq_error = frequency_error;
+
+					/* Compensate phase error */
+					float frequency_error_pcorr = 0.0;
+					int16_t delta_fine_pcorr = 0;
+					if (fabs(mean_phase_error) >= 0.6*config->ref_fluctuations_ns) {
+						frequency_error_pcorr = - mean_phase_error / (LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY);
+						if (fabs(frequency_error_pcorr) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)))
+							delta_fine_pcorr = round(frequency_error_pcorr / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
+					}
+					log_debug("frequency_error_pcorr: %f", frequency_error_pcorr);
+
+					log_debug("delta_fine (pure frequency): %d, delta_fine_pcorr: %d", delta_fine, delta_fine_pcorr);
+					delta_fine += delta_fine_pcorr;
+					log_debug("Sum delta fine: %d", delta_fine);
+
+					if (abs(delta_fine) > LOCK_HIGH_RES_FINE_DELTA_MAX) {
+						delta_fine = delta_fine < 0 ?
+							-LOCK_HIGH_RES_FINE_DELTA_MAX :
+							LOCK_HIGH_RES_FINE_DELTA_MAX;
+					}
+
+					uint16_t new_fine;
+					if (input->fine_setpoint + delta_fine < FINE_MID_RANGE_MIN)
+						new_fine = FINE_MID_RANGE_MIN;
+					else if(input->fine_setpoint + delta_fine > FINE_MID_RANGE_MAX)
+						new_fine = FINE_MID_RANGE_MAX;
+					else
+						new_fine = input->fine_setpoint + delta_fine;
+					log_debug("NEW FINE value: %u", new_fine);
+
+					uint16_t new_fine_from_calib;
+					ret = compute_fine_value(state, coeff*frequency_error, &new_fine_from_calib);
+					if (ret != 0) {
+						log_error("Could not compute fine value for log");
+					} else {
+						log_debug("new_fine_from_calib: %u", new_fine_from_calib);
+					}
+
+					/* Apply computed fine  */
+					set_output(output, ADJUST_FINE, new_fine, 0);
+					/* Update estimated equilibrium */
+					state->estimated_equilibrium_ES =
+						(state->alpha_es_lock_high_res * (new_fine - delta_fine_pcorr)
+						+ (1.0 - state->alpha_es_lock_high_res) * state->estimated_equilibrium_ES);
+					log_info("Estimated equilibrium with exponential smooth is %f",
+						state->estimated_equilibrium_ES);
+					/* Update estimated equilibrium ES in discplining parameters */
+					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+				} else {
+					log_warn("Low linear fit quality, applying estimated equilibrium");
+					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+				}
+				break;
+			}
+			default:
+				log_error("Unhandled state %d", state->status);
+				return -1;
+			}
+		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
+			log_warn("Unstable GNSS: Applying estimated equilibrium");
+			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+		} else {
+			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+			log_info("Applying estimated equilibrium until going out of holdover");
+			set_state(state, HOLDOVER);
+			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
-		log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-		log_info("Applying estimated equilibirum until going out of holdover");
-		state->status = HOLDOVER;
-		output->action = ADJUST_FINE;
-		output->setpoint = state->estimated_equilibrium_ES;
+		set_output(output, NO_OP, 0, 0);
 	}
 	return 0;
 }
@@ -506,6 +1030,8 @@ int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters
 
 struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 {
+	int i;
+
 	if (od == NULL)
 	{
 		log_error("Library context is null");
@@ -533,7 +1059,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		return NULL;
 	}
 
-	for (int i = 0; i < od->dsc_parameters.ctrl_nodes_length; i++)
+	for (i = 0; i < od->dsc_parameters.ctrl_nodes_length; i++)
 	{
 		calib_params->ctrl_points[i] = od->state.ctrl_points[i];
 	}
@@ -559,10 +1085,11 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 
 void od_calibrate(struct od *od, struct calibration_parameters *calib_params, struct calibration_results *calib_results)
 {
-	int ret;
-	int length;
 	struct disciplining_parameters *dsc_parameters;
 	struct algorithm_state *state;
+	int length;
+	int i, j;
+	int ret;
 
 	if (od == NULL || calib_params == NULL || calib_results == NULL)
 	{
@@ -589,19 +1116,16 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 
 	/* Create array representing all the integers between 0 and n_calibration */
 	float x[calib_params->nb_calibration];
-	for (int i = 0; i < calib_params->nb_calibration; i++)
+	for (i = 0; i < calib_params->nb_calibration; i++)
 		x[i] = (float) i;
 
 	/* Update drift coefficients */
 	log_debug("CALIBRATION: Updating drift coefficients:");
-	for (int i = 0; i < length; i++)
+	for (i = 0; i < length; i++)
 	{
 		float v[calib_params->nb_calibration];
-		for(int j = 0; j < calib_params->nb_calibration; j++)
-		{
-			struct timespec * current_measure = calib_results->measures + i * calib_params->nb_calibration + j;
-			v[j] = (float) current_measure->tv_nsec;
-		}
+		for(j = 0; j < calib_params->nb_calibration; j++)
+			v[j] = *(calib_results->measures + i * calib_params->nb_calibration + j);
 
 		struct linear_func_param func_params;
 
@@ -623,24 +1147,17 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		log_debug("\t[%d]: %f", i, dsc_parameters->ctrl_drift_coeffs[i]);
 	}
 
-	float interp_value;
-	for (int i = 0; i < length; i++)
+	for (i = 0; i < length; i++)
 		state->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs[i];
-	ret = lin_interp(
-		state->ctrl_points,
-		state->ctrl_drift_coeffs,
-		length,
-		Y_INTERPOLATION,
-		0,
-		&interp_value
-	);
-	if(ret < 0)
-		log_error("od_calibrate: error occured in lin_interp, err %d", ret);
 
-	state->estimated_equilibrium = (uint32_t) interp_value;
+	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
+	if (ret != 0) {
+		log_error("Error computing fine value");
+		return;
+	}
 	log_debug("Estimated equilibrium is now %d", state->estimated_equilibrium);
 	log_debug("Resetting estimated equiblibrium exponential smooth");
-	state->estimated_equilibrium_ES = state->estimated_equilibrium;
+	state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 	if (state->ctrl_points[length - 1] - state->ctrl_points[0] == 0)
 	{
@@ -665,12 +1182,24 @@ void od_destroy(struct od **od)
 	(*od)->state.ctrl_points = NULL;
 	free((*od)->state.ctrl_drift_coeffs);
 	(*od)->state.ctrl_drift_coeffs = NULL;
+	free((*od)->state.inputs);
+	(*od)->state.inputs = NULL;
 	free(*od);
 	*od = NULL;
 }
 
-int od_get_status(struct od *od) {
-	if (od == NULL)
+int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
+	if (od == NULL || monitoring == NULL)
 		return -1;
-	return od->state.status;
+
+	if (od->minipod_config.tracking_only) {
+		monitoring->clock_class = state_clock_class[od->state.status];
+		monitoring->status = od->state.status;
+		if (od->state.current_phase_convergence_count > round(6.0 / od->state.alpha_es_tracking))
+			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
+	} else {
+		monitoring->clock_class = state_clock_class[od->state.status];
+		monitoring->status = od->state.status;
+	}
+	return 0;
 }

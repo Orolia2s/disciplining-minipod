@@ -54,11 +54,18 @@
 #define OD_ERR_MSG_LEN 0x400
 
 /**
+ * @def PS_IN_NS
+ * @brief Number of picoseconds in one nanosecond
+ */
+#define PS_IN_NS 1000
+
+
+/**
  * @struct minipod_config
  * @brief Minipod configuration
  */
 struct minipod_config {
-		/** Used to filter phase */
+	/** Used to filter phase */
 	int ref_fluctuations_ns;
 	/** Threshold above which as phase jump is requested */
 	int phase_jump_threshold_ns;
@@ -84,12 +91,14 @@ struct minipod_config {
 	 * ctrl_range_fine[1] - fine_stop_tolerance.
 	 */
 	int fine_stop_tolerance;
-	/** Maxium difference allowed when changin coarse value */
+	/** Maximum difference allowed when changin coarse value */
 	int max_allowed_coarse;
 	/** Triggers calibration when starting the program */
 	bool calibrate_first;
 	/** Define wether to use factory settings or not */
 	bool oscillator_factory_settings;
+	/** Set the track only mode */
+	bool tracking_only;
 };
 
 /**
@@ -138,6 +147,8 @@ struct disciplining_parameters {
 	uint8_t ctrl_nodes_length;
 	/** Indicate wether calibration parameters are valid */
 	bool calibration_valid;
+	/** estimated_equilibrium ES from previous tracking phases */
+	uint16_t estimated_equilibrium_ES;
 };
 
 /**
@@ -146,18 +157,20 @@ struct disciplining_parameters {
  * algorithm.
  */
 struct od_input {
-	/** Calibration requested by software of user */
-	bool calibration_requested;
-	/** Coarse adjustement setpoint */
-	int32_t coarse_setpoint;
-	/** Fine adjustement setpoint */
-	uint32_t fine_setpoint;
-	/** is mRO locked */
-	bool lock;
-	/** phase error measured between the oscillator and the GNSS */
-	struct timespec phase_error;
 	/** temperature, only used for logging. */
 	double temperature;
+	/** phase error measured between the oscillator and the GNSS */
+	struct timespec phase_error;
+	/** Fine adjustement setpoint */
+	uint32_t fine_setpoint;
+	/** Coarse adjustement setpoint */
+	int32_t coarse_setpoint;
+	/** Quantization Error **/
+	int32_t qErr;
+	/** Calibration requested by software of user */
+	bool calibration_requested;
+	/** is mRO locked */
+	bool lock;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
 };
@@ -203,13 +216,20 @@ struct od_output {
 enum Disciplining_State {
 	/** Initialization State */
 	INIT,
-	/** Phase adjustement State, nominal one */
-	PHASE_ADJUSTMENT,
+	/** Quick convergence phase, tracking phase error to reach 0 */
+	TRACKING,
 	/** Holdover state, when gnss data is not valid */
 	HOLDOVER,
 	/** Calibration state, when drift coefficients are computed */
 	CALIBRATION,
+	/** Low resolution lock mode */
+	LOCK_LOW_RESOLUTION,
+	/** High resolution lock mode */
+	LOCK_HIGH_RESOLUTION,
+	NUM_STATES
 };
+
+extern const char *status_string[NUM_STATES];
 
 /**
  * @struct od
@@ -242,7 +262,7 @@ struct calibration_results {
 	 * calib_results can be represented as
 	 * a double array of size length * nb_calibration
 	*/
-	struct timespec * measures;
+	float *measures;
 	/** Number of control points.
 	 * Should be equal to calibration_parameters.length
 	 */
@@ -308,11 +328,19 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
  */
 void od_destroy(struct od **od);
 
-/**
- * @brief Returns current algorithm status
- * @param od Algorithm context.
- * @return enum Disciplining_State as an int
- */
-int od_get_status(struct od *od);
+enum ClockClass {
+	CLOCK_CLASS_UNCALIBRATED,
+	CLOCK_CLASS_CALIBRATING,
+	CLOCK_CLASS_HOLDOVER,
+	CLOCK_CLASS_LOCK,
+	CLOCK_CLASS_NUM
+};
+
+struct od_monitoring {
+	enum Disciplining_State status;
+	enum ClockClass clock_class;
+};
+
+int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring);
 
 #endif /* INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_ */
