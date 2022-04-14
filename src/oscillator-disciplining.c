@@ -556,47 +556,53 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
-					if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)
-						&& (uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance
-						&& (uint32_t) round(state->estimated_equilibrium_ES) <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+					/* If fine estimated equilibrium ES is in tolerance range */
+					if ((uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance &&
+						(uint32_t) round(state->estimated_equilibrium_ES) <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
-						/* Update estimated equilibrium ES in discplining parameters */
-						od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
-						/* Smooth convergence reached, adjust to estimated equilibrium smooth */
-						log_info("Smoothing convergence reached");
-						state->estimated_drift = react_coeff;
-						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+						if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)) {
+							/* Update estimated equilibrium ES in discplining parameters */
+							od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+							/* Smooth convergence reached, adjust to estimated equilibrium smooth */
+							log_info("Smoothing convergence reached");
+							state->estimated_drift = react_coeff;
 
-						/* Switch to LOCK_LOW_RESOLUTION_STATE */
-						if (!config->tracking_only)
-							set_state(state, LOCK_LOW_RESOLUTION);
-						return 0;
-					} else if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
-						log_warn("Estimated equilibrium is out of range !");
-						uint32_t new_coarse = input->coarse_setpoint;
-						if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
-							new_coarse = input->coarse_setpoint + 1;
-						else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
-							new_coarse = input->coarse_setpoint - 1;
-						log_info("Adjusting coarse value to %u", new_coarse);
-						set_output(output, ADJUST_COARSE, new_coarse, 0);
+							/* Switch to LOCK_LOW_RESOLUTION_STATE if tracking_only is disabled */
+							if (!config->tracking_only) {
+								set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+								set_state(state, LOCK_LOW_RESOLUTION);
+								return 0;
+							}
+						}
+					} else {
+						/* Check if we did more that 2 convergence count threshold */
+						if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
+							log_warn("Estimated equilibrium is out of range !");
+							uint32_t new_coarse = input->coarse_setpoint;
+							if ((uint32_t) round(state->estimated_equilibrium_ES) < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint + 1;
+							else if ((uint32_t) round(state->estimated_equilibrium_ES) > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint - 1;
+							log_info("Adjusting coarse value to %u", new_coarse);
+							set_output(output, ADJUST_COARSE, new_coarse, 0);
 
-						/* Reset Tracking state */
-						set_state(state, TRACKING);
+							/* Reset Tracking state */
+							set_state(state, TRACKING);
 
-						/* Update estimated equilibrium ES to initial guess */
-						if (dsc_parameters->estimated_equilibrium_ES != 0)
-							state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
-						else
-							state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+							/* Update estimated equilibrium ES to initial guess */
+							if (dsc_parameters->estimated_equilibrium_ES != 0)
+								state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+							else
+								state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
-						if (config->oscillator_factory_settings)
-							dsc_parameters->coarse_equilibrium_factory = new_coarse;
-						else
-							dsc_parameters->coarse_equilibrium = new_coarse;
-						return 0;
+							if (config->oscillator_factory_settings)
+								dsc_parameters->coarse_equilibrium_factory = new_coarse;
+							else
+								dsc_parameters->coarse_equilibrium = new_coarse;
+							return 0;
+						}
 					}
-					
+
 					/* current_phase_convergence_count is below current_phase_convergence_count_threshold*/
 					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
 						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
