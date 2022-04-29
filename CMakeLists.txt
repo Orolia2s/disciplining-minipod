@@ -33,7 +33,7 @@ add_definitions("
     -Wmissing-prototypes
     -Wpointer-arith
     -DLOG_USE_COLOR")
-add_definitions("-DOD_REVISION=\"${PACKAGE_VERSION}\"")
+add_definitions("-DPACKAGE_VERSION=\"${PACKAGE_VERSION}\"")
 
 add_subdirectory(include)
 add_subdirectory(pkgconfig)
