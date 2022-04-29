@@ -186,11 +186,11 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 
 static int init_algorithm_state(struct od * od) {
 	int ret;
-
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
 	struct minipod_config *config = &od->minipod_config;
 
+	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
 	/* Init state variables */
 	set_state(state, INIT);
 	state->calib = false;
@@ -414,7 +414,8 @@ int od_process(struct od *od, const struct od_input *input,
 		state->od_inputs_count = 0;
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
-		if (gnss_state == GNSS_OK && mro50_lock_state)
+		/* TODO: DELETE || od->state.status  == INIT)*/
+		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
 			if (od->state.status != CALIBRATION
 				&& (
@@ -459,22 +460,19 @@ int od_process(struct od *od, const struct od_input *input,
 
 			/* Initialization */
 			case INIT:
-				if (config->oscillator_factory_settings
-					&& dsc_parameters->coarse_equilibrium_factory >= 0
-					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory)
-				{
+				if (dsc_parameters->coarse_equilibrium_factory > 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
 					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-				} else if (!config->oscillator_factory_settings
-					&& dsc_parameters->coarse_equilibrium >= 0
-					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium)
-				{
+				} else if (dsc_parameters->coarse_equilibrium > 0
+					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else {
-					if (dsc_parameters->coarse_equilibrium < 0)
+					if (dsc_parameters->coarse_equilibrium < 0) {
 						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
+					}
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
