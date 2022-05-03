@@ -245,8 +245,34 @@ static int init_algorithm_state(struct od * od) {
 			dsc_parameters->ctrl_nodes_length
 		);
 	}
-	if (ret != 0)
-		return ret;
+	if (ret != 0) {
+		log_warn("Could not initialize algorithm with data from config, using default parameters");
+		dsc_parameters->ctrl_nodes_length = 3;
+		dsc_parameters->ctrl_load_nodes[0] = 0.25;
+		dsc_parameters->ctrl_load_nodes[1] = 0.5;
+		dsc_parameters->ctrl_load_nodes[2] = 0.75;
+		dsc_parameters->ctrl_drift_coeffs[0] = 1.2;
+		dsc_parameters->ctrl_drift_coeffs[1] = 0.0;
+		dsc_parameters->ctrl_drift_coeffs[2] = -1.2;
+		dsc_parameters->coarse_equilibrium = -1;
+		dsc_parameters->ctrl_load_nodes_factory[0] = 0.25;
+		dsc_parameters->ctrl_load_nodes_factory[1] = 0.5;
+		dsc_parameters->ctrl_load_nodes_factory[2] = 0.75;
+		dsc_parameters->ctrl_drift_coeffs_factory[0] = 1.2;
+		dsc_parameters->ctrl_drift_coeffs_factory[1] = 0.0;
+		dsc_parameters->ctrl_drift_coeffs_factory[2] = -1.2;
+		dsc_parameters->coarse_equilibrium_factory = -1;
+		dsc_parameters->calibration_valid = false;
+		config->calibrate_first = false;
+		ret = init_ctrl_points(
+			state,
+			dsc_parameters->ctrl_load_nodes,
+			dsc_parameters->ctrl_drift_coeffs,
+			dsc_parameters->ctrl_nodes_length
+		);
+		if (ret != 0)
+			return ret;
+	}
 
 	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
 	if (ret != 0) {
