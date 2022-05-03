@@ -393,6 +393,8 @@ struct od *od_new_from_config(struct minipod_config *minipod_config, struct disc
 	ret = init_algorithm_state(od);
 	if (ret < 0) {
 		log_error("Error occured during init_algorithm_state, err %d", ret);
+		free(od);
+		od = NULL;
 	}
 	return od;
 }
