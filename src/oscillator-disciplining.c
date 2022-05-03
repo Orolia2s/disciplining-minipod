@@ -488,19 +488,19 @@ int od_process(struct od *od, const struct od_input *input,
 
 			/* Initialization */
 			case INIT:
-				if (dsc_parameters->coarse_equilibrium_factory > 0
+				if (config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium_factory > 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
 					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
-				} else if (dsc_parameters->coarse_equilibrium > 0
+				} else if (!config->oscillator_factory_settings
+					&& dsc_parameters->coarse_equilibrium > 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else {
-					if (dsc_parameters->coarse_equilibrium < 0) {
-						log_warn("Unknown coarse_equilibrium, using value saved in oscillator,"
-							"consider calibration if disciplining is not efficient");
-					}
+					log_warn("Unknown coarse_equilibrium in current config, using value saved in oscillator,"
+						"consider calibration if disciplining is not efficient");
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
