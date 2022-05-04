@@ -186,6 +186,7 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 
 static int init_algorithm_state(struct od * od) {
 	int ret;
+	int i;
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
 	struct minipod_config *config = &od->minipod_config;
@@ -228,7 +229,6 @@ static int init_algorithm_state(struct od * od) {
 	if (config->oscillator_factory_settings || !dsc_parameters->calibration_valid) {
 		if (!dsc_parameters->calibration_valid) {
 			log_warn("Calibration parameters are not valid for this card. Factory settings will be used.");
-			log_warn("Please calibrate your card on a stable gnss reference if you want to use calibration parameters");
 		}
 		log_debug("Using factory settings");
 		ret = init_ctrl_points(
@@ -238,15 +238,37 @@ static int init_algorithm_state(struct od * od) {
 			dsc_parameters->ctrl_nodes_length_factory
 		);
 	} else {
+		/* Init control points with user parameters */
 		ret = init_ctrl_points(
 			state,
 			dsc_parameters->ctrl_load_nodes,
 			dsc_parameters->ctrl_drift_coeffs,
 			dsc_parameters->ctrl_nodes_length
 		);
+		if (ret != 0) {
+			/* User parameters are not correct, trying to use factory parameters */
+			log_warn("User parameters are corrupted, trying to use factory parameters");
+			ret = init_ctrl_points(
+				state,
+				dsc_parameters->ctrl_load_nodes_factory,
+				dsc_parameters->ctrl_drift_coeffs_factory,
+				dsc_parameters->ctrl_nodes_length_factory
+			);
+			if (ret == 0) {
+				log_info("Factory parameters can be used, resetting user parameters to factory ones");
+				dsc_parameters->ctrl_nodes_length = dsc_parameters->ctrl_nodes_length_factory;
+				dsc_parameters->coarse_equilibrium = dsc_parameters->coarse_equilibrium_factory;
+				for (i = 0; i < dsc_parameters->ctrl_nodes_length; i++) {
+					dsc_parameters->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs_factory[i];
+					dsc_parameters->ctrl_load_nodes[i] = dsc_parameters->ctrl_load_nodes_factory[i];
+				}
+				dsc_parameters->estimated_equilibrium_ES = 0;
+			}
+		}
+
 	}
 	if (ret != 0) {
-		log_warn("Could not initialize algorithm with data from config, using default parameters");
+		log_warn("Could not initialize algorithm with factory data from config, resetting default parameters");
 		dsc_parameters->ctrl_nodes_length = 3;
 		dsc_parameters->ctrl_load_nodes[0] = 0.25;
 		dsc_parameters->ctrl_load_nodes[1] = 0.5;
@@ -589,6 +611,11 @@ int od_process(struct od *od, const struct od_input *input,
 						if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)) {
 							/* Update estimated equilibrium ES in discplining parameters */
 							od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+							/* Consider card as calibrated if user parameters are used */
+							if (!od->minipod_config.oscillator_factory_settings) {
+								od->dsc_parameters.calibration_valid = true;
+								od->dsc_parameters.calibration_date = time(NULL);
+							}
 							/* Smooth convergence reached, adjust to estimated equilibrium smooth */
 							log_info("Smoothing convergence reached");
 							state->estimated_drift = react_coeff;
