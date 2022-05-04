@@ -226,10 +226,7 @@ static int init_algorithm_state(struct od * od) {
 	/*
 	 * Check wether nominal parameters should be used or factory ones
 	 */
-	if (config->oscillator_factory_settings || !dsc_parameters->calibration_valid) {
-		if (!dsc_parameters->calibration_valid) {
-			log_warn("Calibration parameters are not valid for this card. Factory settings will be used.");
-		}
+	if (config->oscillator_factory_settings) {
 		log_debug("Using factory settings");
 		ret = init_ctrl_points(
 			state,
@@ -238,13 +235,18 @@ static int init_algorithm_state(struct od * od) {
 			dsc_parameters->ctrl_nodes_length_factory
 		);
 	} else {
-		/* Init control points with user parameters */
-		ret = init_ctrl_points(
-			state,
-			dsc_parameters->ctrl_load_nodes,
-			dsc_parameters->ctrl_drift_coeffs,
-			dsc_parameters->ctrl_nodes_length
-		);
+		if (!dsc_parameters->calibration_valid) {
+			log_warn("Calibration parameters are not valid for this card. Factory settings will be used.");
+			ret = -1;
+		} else {
+			/* Init control points with user parameters */
+			ret = init_ctrl_points(
+				state,
+				dsc_parameters->ctrl_load_nodes,
+				dsc_parameters->ctrl_drift_coeffs,
+				dsc_parameters->ctrl_nodes_length
+			);
+		}
 		if (ret != 0) {
 			/* User parameters are not correct, trying to use factory parameters */
 			log_warn("User parameters are corrupted, trying to use factory parameters");
