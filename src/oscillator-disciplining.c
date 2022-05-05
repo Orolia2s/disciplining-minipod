@@ -523,8 +523,11 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else {
-					log_warn("Unknown coarse_equilibrium in current config, using value saved in oscillator,"
-						"consider calibration if disciplining is not efficient");
+					if ((!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium < 0) ||
+						(config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory < 0)) {
+						log_warn("Unknown coarse_equilibrium in current config, using value saved in oscillator,"
+							"consider calibration if disciplining is not efficient");
+					}
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
