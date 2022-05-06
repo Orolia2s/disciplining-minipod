@@ -701,7 +701,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
-						&& fabs(state->inputs[WINDOW_TRACKING].phase_error - state->inputs[0].phase_error)
+						&& fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
 						if (state->current_phase_convergence_count <= round(1.0 / state->alpha_es_tracking)) {
@@ -717,6 +717,19 @@ int od_process(struct od *od, const struct od_input *input,
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
 							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking) + 1;
+					} else {
+						/* We cannot compute a new estimated equilibrium, logging why */
+						log_warn("Estimated equilibrium will not be updated at this step, not updating convergence count as well");
+						if (fabs(mean_phase_error) >= config->ref_fluctuations_ns)
+							log_warn("Mean phase error is too high: %f >= %d", fabs(mean_phase_error), config->ref_fluctuations_ns);
+						if (state->fine_ctrl_value < state->ctrl_range_fine[0]
+							|| state->fine_ctrl_value > state->ctrl_range_fine[1])
+							log_warn("Last fine ctrl value is out of middle range: %u", state->fine_ctrl_value);
+						if (fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error)
+							>= (float) config->ref_fluctuations_ns)
+							log_warn("Phase error diff is too high: %f >= %d",
+								fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error),
+								config->ref_fluctuations_ns);
 					}
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
