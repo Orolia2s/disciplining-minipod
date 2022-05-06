@@ -46,22 +46,48 @@
 #include "phase.h"
 #include "utils.h"
 
+/**
+ * @def SETTLING_TIME_MRO50
+ * @brief Time oscillator needs to apply new control values
+ */
 #define SETTLING_TIME_MRO50 6
+/**
+ * @def WINDOW_TRACKING
+ * @brief Number of inputs for tracking state
+ */
 #define WINDOW_TRACKING 6
+/**
+ * @def WINDOW_LOCK_LOW_RESOLUTION
+ * @brief Number of inputs for lock low resolution state
+ * Only values from [5:65] will be taken in computation
+ */
 #define WINDOW_LOCK_LOW_RESOLUTION 66
 #define LOCK_LOW_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 1000
+/**
+ * @def WINDOW_LOCK_HIGH_RESOLUTION
+ * @brief Number of inputs for lock high resolution state
+ * Only values from [5:605] will be taken in computation
+ */
 #define WINDOW_LOCK_HIGH_RESOLUTION 606
 #define LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 3000
 
+/**
+ * @brief Window size used for each step
+ *
+ */
 uint16_t state_windows[NUM_STATES] = {
-	WINDOW_TRACKING,
-	WINDOW_TRACKING,
-	WINDOW_TRACKING,
-	WINDOW_TRACKING,
-	WINDOW_LOCK_LOW_RESOLUTION,
-	WINDOW_LOCK_HIGH_RESOLUTION
+	WINDOW_TRACKING, /* INIT */
+	WINDOW_TRACKING, /* TRACKING */
+	WINDOW_TRACKING, /* HOLDOVER */
+	WINDOW_TRACKING, /* CALIBRATION */
+	WINDOW_LOCK_LOW_RESOLUTION, /* LOCK_LOW_RESOLUTION */
+	WINDOW_LOCK_HIGH_RESOLUTION /* LOCK_HIGH_RESOLUTION */
 };
 
+/**
+ * @brief Strings displayed for each status
+ *
+ */
 const char *status_string[NUM_STATES] = {
 	"INIT",
 	"TRACKING",
@@ -71,13 +97,17 @@ const char *status_string[NUM_STATES] = {
 	"LOCK_HIGH_RESOLUTION"
 };
 
+/**
+ * @brief Default Clock class for each state
+ *
+ */
 const enum ClockClass state_clock_class[NUM_STATES] = {
-	CLOCK_CLASS_UNCALIBRATED,
-	CLOCK_CLASS_CALIBRATING,
-	CLOCK_CLASS_HOLDOVER,
-	CLOCK_CLASS_CALIBRATING,
-	CLOCK_CLASS_CALIBRATING,
-	CLOCK_CLASS_LOCK
+	CLOCK_CLASS_UNCALIBRATED, /* INIT */
+	CLOCK_CLASS_CALIBRATING, /* TRACKING */
+	CLOCK_CLASS_HOLDOVER, /* HOLDOVER */
+	CLOCK_CLASS_CALIBRATING, /* CALIBRATION */
+	CLOCK_CLASS_CALIBRATING, /* LOCK_LOW_RESOLUTION */
+	CLOCK_CLASS_LOCK /* LOCK_HIGH_RESOLUTION */
 };
 
 /**
@@ -92,6 +122,12 @@ struct od {
 	struct disciplining_parameters dsc_parameters;
 };
 
+/**
+ * @brief Set new state and reset counter related to state
+ *
+ * @param state pointer to algorithm_state structure that will be updated
+ * @param new_state New state value
+ */
 static void set_state(struct algorithm_state *state, enum Disciplining_State new_state)
 {
 	state->status = new_state;
@@ -100,6 +136,14 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 	state->current_phase_convergence_count = 0;
 }
 
+/**
+ * @brief Set the output action and value defined by algorithm
+ *
+ * @param output pointer to structure to be update
+ * @param action
+ * @param setpoint
+ * @param value_phase_ctrl
+ */
 static void set_output(struct od_output *output, enum output_action action, uint32_t setpoint, int32_t value_phase_ctrl)
 {
 	output->action = action;
@@ -108,6 +152,15 @@ static void set_output(struct od_output *output, enum output_action action, uint
 	return;
 }
 
+/**
+ * @brief Init ctrl points used by algorithm to compute relation between fine value applied and phase error expected
+ *
+ * @param state pointer to algorithm_state which points will be initialized
+ * @param load_nodes fine points in percentage of the range
+ * @param drift_coeffs drift coefficients for each fine points
+ * @param length size of the two arrays
+ * @return int 0 on success else error
+ */
 static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, float *drift_coeffs, uint8_t length) {
 	uint16_t diff_fine;
 	int i;
@@ -125,11 +178,15 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 		return -ENOMEM;
 
 	state->ctrl_drift_coeffs = malloc(length * sizeof(float));
+	if (state->ctrl_drift_coeffs == NULL)
+		return -ENOMEM;
 
 	diff_fine = state->ctrl_range_fine[1] - state->ctrl_range_fine[0];
 	log_debug("Control points used:");
 	for (i = 0; i < length; i++) {
+		/* Control points used over the fine range */
 		state->ctrl_points[i] = (float) state->ctrl_range_fine[0] + load_nodes[i] * diff_fine;
+		/* drift coefficients for each control point */
 		state->ctrl_drift_coeffs[i] = drift_coeffs[i];
 		log_debug("\t%d: %f -> %f", i, state->ctrl_points[i], state->ctrl_drift_coeffs[i]);
 	}
@@ -137,6 +194,14 @@ static int init_ctrl_points(struct algorithm_state *state, float *load_nodes, fl
 	return 0;
 }
 
+/**
+ * @brief Compute fine value to apply to reach 0 phase error
+ *
+ * @param state pointer to algorithm_state
+ * @param react_coeff reactivity coefficient
+ * @param fine_ctrl_value pointer where fine value will be stored
+ * @return int 0 on success else -1
+ */
 static int compute_fine_value(struct algorithm_state *state, float react_coeff, uint16_t *fine_ctrl_value)
 {
 	float interpolation_value;
@@ -164,6 +229,12 @@ static int compute_fine_value(struct algorithm_state *state, float react_coeff, 
 	return 0;
 }
 
+/**
+ * @brief Print inputs' phase error
+ *
+ * @param inputs array of input data containing gnss valid flag
+ * @param length array length
+ */
 static void print_inputs(struct algorithm_input *inputs, int length)
 {
 	int i;
@@ -184,6 +255,12 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 	str = NULL;
 }
 
+/**
+ * @brief Initialize algorithm state with disciplining_parameters and minipod config
+ *
+ * @param od library context
+ * @return int 0 on sucess else error
+ */
 static int init_algorithm_state(struct od * od) {
 	int ret;
 	int i;
@@ -192,10 +269,8 @@ static int init_algorithm_state(struct od * od) {
 	struct minipod_config *config = &od->minipod_config;
 
 	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
-	/* Init state variables */
-	set_state(state, INIT);
-	state->calib = false;
 
+	/* Constant state values */
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
 
@@ -205,17 +280,22 @@ static int init_algorithm_state(struct od * od) {
 	state->ctrl_range_fine[1] = FINE_MID_RANGE_MAX;
 
 	state->fine_mid = (uint16_t) (0.5 * (FINE_MID_RANGE_MIN + FINE_MID_RANGE_MAX));
+
+	/* Init Alpha Equilibrium smooth */
+	state->alpha_es_tracking = 0.01;
+	state->alpha_es_lock_low_res = 0.05;
+	state->alpha_es_lock_high_res = 0.25;
+
+	/* Init state variables to default values */
+	set_state(state, INIT);
+	state->calib = false;
 	state->fine_ctrl_value = 0;
 
 	state->estimated_drift = 0;
 	state->current_phase_convergence_count = 0;
 	state->previous_freq_error = 0.0;
 
-	/* Init Alpha Equilibrium smooth */
-	state->alpha_es_tracking = 0.01;
-	state->alpha_es_lock_low_res = 0.05;
-	state->alpha_es_lock_high_res = 0.25;
-	
+
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
 	if (!state->inputs) {
@@ -223,10 +303,12 @@ static int init_algorithm_state(struct od * od) {
 		return -1;
 	}
 
-	/*
-	 * Check wether nominal parameters should be used or factory ones
-	 */
+	/* Check wether user parameters or factory ones should be used */
 	if (config->oscillator_factory_settings) {
+		/*
+		 * Factory settings should be used
+		 * Program will use factory settings and will not update user parameters
+		 */
 		log_debug("Using factory settings");
 		ret = init_ctrl_points(
 			state,
@@ -235,6 +317,13 @@ static int init_algorithm_state(struct od * od) {
 			dsc_parameters->ctrl_nodes_length_factory
 		);
 	} else {
+		/*
+		 * User parameters should be used
+		 * First we check calibration valid flag to check if user parameters are valid
+		 * Then we try to initialize control points using these values
+		 * If this fail factory parameters will override user parameters
+		 * and we will initialize using factory parameters
+		 */
 		if (!dsc_parameters->calibration_valid) {
 			log_warn("Calibration parameters are not valid for this card. Factory settings will be used.");
 			ret = -1;
@@ -270,6 +359,7 @@ static int init_algorithm_state(struct od * od) {
 
 	}
 	if (ret != 0) {
+		/* If factory parameters cannot be used then we reset both factory and user parameters to default values */
 		log_warn("Could not initialize algorithm with factory data from config, resetting default parameters");
 		dsc_parameters->ctrl_nodes_length = 3;
 		dsc_parameters->ctrl_load_nodes[0] = 0.25;
@@ -311,10 +401,16 @@ static int init_algorithm_state(struct od * od) {
 	return 0;
 }
 
-/*
- * Check if fine control setpoint is within available range +/- a tolerance.
+/**
+ * @brief Check if fine control setpoint is within available range +/- a tolerance.
  * If not the coarse control value is changed in order to re-center the fine control.
  * init_control_mRO must be called after a coarse change.
+ * This is used to check if calibration went well or not
+ *
+ * @param od library context
+ * @param input Pointer to input structure
+ * @param output Pointer to output structure
+ * @return wether calibration is good or not
  */
 static bool control_check_mRO(struct od *od, const struct od_input *input, struct od_output *output) {
 	struct algorithm_state *state = &(od->state);
@@ -385,6 +481,13 @@ static float get_reactivity(float phase_ns, int sigma, int min, int max, int pow
 	return r > min ? r : min;
 }
 
+/**
+ * @brief Add a new input to algorithm_input array
+ * This is done each second to fill a state's window
+ *
+ * @param algorithm_input
+ * @param input
+ */
 static void add_input_to_algorithm(struct algorithm_input *algorithm_input, const struct od_input *input)
 {
 	algorithm_input->phase_error = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
@@ -442,6 +545,8 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
+
+	/* Reset output structure */
 	set_output(output, NO_OP, 0, 0);
 
 	/* Add new algorithm input */
@@ -461,12 +566,13 @@ int od_process(struct od *od, const struct od_input *input,
 		input->valid ? "True" : "False", input->lock ? "True" : "False"
 	);
 
-
+	/* Check if we reached the number of inputs required to process state's step */
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
 		/* TODO: DELETE || od->state.status  == INIT)*/
+		/* Check if GNSS state is valid and mro50 is locked */
 		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
 			if (od->state.status != CALIBRATION
@@ -485,6 +591,7 @@ int od_process(struct od *od, const struct od_input *input,
 			}
 
 			float mean_phase_error;
+			/* State machine defining what to do, depending on current state and inputs for the state */
 			switch(state->status) {
 			/* Calibration: calibration data is available and control check must be done */
 			case CALIBRATION:
@@ -512,22 +619,36 @@ int od_process(struct od *od, const struct od_input *input,
 
 			/* Initialization */
 			case INIT:
+				/*
+				 * Check if algorithm is using factory settings
+				 * if so check if coarse_equilibrium_factory is superior to 0 (known coarse_equilibrium_factory)
+				 * and that coarse set on mRO50 is equal to coarse_equilibrium_factory
+				 */
 				if (config->oscillator_factory_settings
 					&& dsc_parameters->coarse_equilibrium_factory > 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
 					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+				/*
+				 * Check if algorithm is using user settings
+				 * if so check if coarse_equilibrium is superior to 0 (known coarse_equilibrium)
+				 * and that coarse set on mRO50 is equal to coarse_equilibrium
+				 */
 				} else if (!config->oscillator_factory_settings
 					&& dsc_parameters->coarse_equilibrium > 0
 					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
 					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
 					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
 				} else {
+					/*
+					 * Check if coarse is known, wether we are using factory settings or not
+					 */
 					if ((!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium < 0) ||
 						(config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory < 0)) {
 						log_warn("Unknown coarse_equilibrium in current config, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
 					}
+					/* Set fine value to estimated equilibrium */
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
 					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
@@ -535,15 +656,21 @@ int od_process(struct od *od, const struct od_input *input,
 				return 0;
 				break;
 
-			/* Holdover and valid flag switched to valid,
-			* We wait for one cycle to start disciplining again
-			*/
+			/*
+			 * Holdover and valid flag switched to valid,
+			 * We wait for one cycle to start disciplining again
+			 */
 			case HOLDOVER:
 				set_state(state, TRACKING);
 				set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 				log_info("HOLDOVER: Gnss flag valid again, waiting one cycle before restarting disciplining");
 				break;
 
+			/*
+			 * Tracking mode:
+			 * Only mean phase error is used to define fine value to apply
+			 * Goal of this state is to reach minimum phase error possible
+			 */
 			case TRACKING:
 				print_inputs(state->inputs, WINDOW_TRACKING);
 				/* Compute mean phase error over cycle */
@@ -557,7 +684,7 @@ int od_process(struct od *od, const struct od_input *input,
 				/* Check phase error is below threshold configured */
 				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
-					/* Call Main loop */
+					/* Check inputs values does not contain any outlier */
 					if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
 						mean_phase_error, config->ref_fluctuations_ns))
 					{
@@ -567,7 +694,10 @@ int od_process(struct od *od, const struct od_input *input,
 						return 0;
 					}
 
-					/* Phase error is below reference and control value in midrange */
+					/*
+					 * Phase error is below reference and control value in midrange
+					 * We can compute a new estimated equilibrium
+					 */
 					if (fabs(mean_phase_error) < config->ref_fluctuations_ns
 						&& (state->fine_ctrl_value >= state->ctrl_range_fine[0]
 						&& state->fine_ctrl_value <= state->ctrl_range_fine[1])
@@ -613,6 +743,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if ((uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance &&
 						(uint32_t) round(state->estimated_equilibrium_ES) <= (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
 					{
+						/* Check if we reached convergence enough time to switch to lock low resolution */
 						if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)) {
 							/* Update estimated equilibrium ES in discplining parameters */
 							od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
@@ -633,7 +764,7 @@ int od_process(struct od *od, const struct od_input *input,
 							}
 						}
 					} else {
-						/* Check if we did more that 2 convergence count threshold */
+						/* Check if we did more that 2 convergence count threshold, if so adjust coarse and restart tracking */
 						if (state->current_phase_convergence_count > 2 * round(6.0 / state->alpha_es_tracking)) {
 							log_warn("Estimated equilibrium is out of range !");
 							uint32_t new_coarse = input->coarse_setpoint;
@@ -661,7 +792,12 @@ int od_process(struct od *od, const struct od_input *input,
 						}
 					}
 
-					/* current_phase_convergence_count is below current_phase_convergence_count_threshold*/
+					/*
+					 * Estimated equilibrium is in tolerance range and current_phase_convergence_count
+					 * is below current_phase_convergence_count_threshold
+					 * or we did not reach 2 convergence count
+					 * We apply fine value if it is not out of range
+					 */
 					if (state->fine_ctrl_value >= FINE_RANGE_MIN + config->fine_stop_tolerance
 						&& state->fine_ctrl_value <= FINE_RANGE_MAX - config->fine_stop_tolerance)
 					{
@@ -699,6 +835,7 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					return 0;
 				} else {
+					/* Phase error is superior to threshold, we need to do a phase jump */
 					if (state->current_phase_convergence_count <= round(6.0 / state->alpha_es_tracking)) {
 						/* Phase jump needed */
 						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
@@ -1062,9 +1199,11 @@ int od_process(struct od *od, const struct od_input *input,
 				log_error("Unhandled state %d", state->status);
 				return -1;
 			}
+		/* else if gnss is unstable, apply estimated equilibrium to prevent reaching holdover on an unstable state */
 		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
 			log_warn("Unstable GNSS: Applying estimated equilibrium");
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+		/* else go into holdover mode */
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
