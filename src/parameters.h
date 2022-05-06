@@ -21,12 +21,7 @@
 #define PARAMETERS_H
 /**
  * @file parameters.h
- * @brief Functions to parse and print config and/or parameters of the disciplining library.
- *
- * Provides one function to parse all parameters define in algorithm parameters
- * Uses internal functions to parse different types of parameters (double, int,
- * boolean, char, double array)
- *
+ * @brief Functions to print config and/or parameters of the disciplining library.
  */
 
 #include <stdio.h>
@@ -34,9 +29,6 @@
 #include <oscillator-disciplining/oscillator-disciplining.h>
 #include "algorithm_structs.h"
 #include "log.h"
-
-int get_disciplining_parameters(struct disciplining_parameters *dsc_params, const char *path);
-int update_disciplining_parameters(struct disciplining_parameters *dsc_params, const char *path);
 
 static inline void print_minipod_config(struct minipod_config *config) {
 	log_debug("Minipod Config:");
@@ -56,15 +48,16 @@ static inline void print_minipod_config(struct minipod_config *config) {
 
 static inline void print_disciplining_parameters(struct disciplining_parameters *params)
 {
+	int i = 0;
 	log_debug("Discipining Parameters:");
 	log_debug("\t- ctrl_nodes_length: %d", params->ctrl_nodes_length);
 
 	log_debug("\t- ctrl_load_nodes:");
-	for (int i = 0; i < params->ctrl_nodes_length; i++)
+	for (i = 0; i < params->ctrl_nodes_length; i++)
 		log_debug("\t\t- [%d]: %f", i, params->ctrl_load_nodes[i]);
 
 	log_debug("\t- ctrl_drift_coeffs]:");
-	for (int i = 0; i < params->ctrl_nodes_length; i++)
+	for (i = 0; i < params->ctrl_nodes_length; i++)
 		log_debug("\t\t- [%d]: %f", i, params->ctrl_drift_coeffs[i]);
 
 	log_debug("\t- coarse_equilibrium: %d", params->coarse_equilibrium);
@@ -73,10 +66,10 @@ static inline void print_disciplining_parameters(struct disciplining_parameters 
 	log_debug("\t- ctrl_nodes_length_factory: %d", params->ctrl_nodes_length_factory);
 
 	log_debug("\t- ctrl_load_nodes_factory:");
-	for (int i = 0; i < params->ctrl_nodes_length_factory; i++)
+	for (i = 0; i < params->ctrl_nodes_length_factory; i++)
 		log_debug("\t\t- [%d]: %f", i, params->ctrl_load_nodes_factory[i]);
 	log_debug("\t- ctrl_drift_coeffs_factory:");
-	for (int i = 0; i < params->ctrl_nodes_length_factory; i++)
+	for (i = 0; i < params->ctrl_nodes_length_factory; i++)
 		log_debug("\t\t- [%d]: %f", i, params->ctrl_drift_coeffs_factory[i]);
 	log_debug("\t- coarse_equilibrium_factory: %d", params->coarse_equilibrium_factory);
 
