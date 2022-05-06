@@ -1,3 +1,30 @@
+/*
+ * liboscillator-disciplining: Disciplining Algorithm for Orolia's mRO50.
+ * Copyright (C) 2021  Spectracom SAS
+
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+/**
+ * @file checks.c
+ * @brief Functions used to perform check over input data of the algorithm
+ * @date 2022-05-06
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #include <math.h>
 
 #include "checks.h"
@@ -7,6 +34,18 @@
 
 #define GNSS_INVALID_MAX_STREAK 10
 
+/**
+ * @brief Define wether gnss is considered as valid over a cycle of length steps
+ * by checking the gnss valid flag each input has.
+ * GNSS is considered Ok if all valid flags are true over cycle
+ * GNSS is considered Unstabled if less that a 1/3 of valid flags are flase
+ * and the maximum streak of false values over the cycle is inferior to 10
+ * GNSS is considered KO otherwise
+ *
+ * @param inputs array of input data containing gnss valid flag
+ * @param length array length
+ * @return enum gnss_state Indicate GNSS is considered OK, UNSTABLE or KO
+ */
 enum gnss_state check_gnss_valid_over_cycle(struct algorithm_input *inputs, int length)
 {
 	int i;
@@ -52,6 +91,14 @@ enum gnss_state check_gnss_valid_over_cycle(struct algorithm_input *inputs, int 
 		return GNSS_KO;
 }
 
+/**
+ * @brief Define wether oscillator lock status is valid over a cycle
+ * by checking lock status each input has
+ *
+ * @param inputs array of input data containing gnss valid flag
+ * @param length array length
+ * @return Lock is valid on all inputs or not
+ */
 bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
 {
 	bool lock_valid = true;
@@ -67,6 +114,17 @@ bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
 	return lock_valid;
 }
 
+/**
+ * @brief Check for each input that the absolute difference between input's phase error
+ * and mean phase error is inferior to ref_fluctuation_ns
+ *
+ * @param inputs array of input data containing gnss valid flag
+ * @param length array length
+ * @param mean_phase_error Mean phase error
+ * @param ref_fluctuation_ns Fluctuaction reference
+ * @return true
+ * @return false
+ */
 bool check_no_outlier(struct algorithm_input *inputs, int length, float mean_phase_error, int ref_fluctuation_ns)
 {
 	int i;
