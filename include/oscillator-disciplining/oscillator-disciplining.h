@@ -43,7 +43,7 @@
 
 /**
  * @def SETTLING_TIME
- * @brief Time elapsed between each loop of the od_process loop
+ * @brief Time oscillator needs to apply new control values
  */
 #define SETTLING_TIME 6
 
