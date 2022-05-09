@@ -573,7 +573,7 @@ int od_process(struct od *od, const struct od_input *input,
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
 		/* TODO: DELETE || od->state.status  == INIT)*/
 		/* Check if GNSS state is valid and mro50 is locked */
-		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
+		if	(gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
 			if (od->state.status != CALIBRATION
 				&& (
@@ -1223,6 +1223,9 @@ int od_process(struct od *od, const struct od_input *input,
 			set_state(state, HOLDOVER);
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
+	} else if (state->od_inputs_count % 6 == 0 && state->od_inputs_count > 30) {
+		enum gnss_state gnss_state = check_gnss_valid_over_cycle(&state->inputs[state->od_inputs_count - 31], 30);
+
 	} else {
 		set_output(output, NO_OP, 0, 0);
 	}
