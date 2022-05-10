@@ -76,7 +76,7 @@ int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATUR
     /* Compute index of fine_buffer value should be stored */
     index = (int) floor(2 * (temp - MIN_TEMPERATURE));
 
-    log_debug("Adding data at temperature %f in index %d", temp, index);
+    log_debug("Adding data at temperature %.2f in index %d", temp, index);
     struct fine_tuple tuple = {
         .fine_applied = fine_applied,
         .fine_estimated_equilibrium_ES = fine_estimated_ES
