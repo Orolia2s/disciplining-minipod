@@ -28,6 +28,8 @@
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
+#include "fine_circular_buffer.h"
+
 /** mRO base fine step sensitivity */
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
 /** mRO base coarse step sensitivity */
@@ -156,6 +158,7 @@ struct algorithm_state {
 	float mRO_EP_temperature;
 	/** MRO50's smoothed temperature when entering holdover */
 	float holdover_mRO_EP_temperature;
+	struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS];
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
