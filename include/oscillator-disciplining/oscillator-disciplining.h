@@ -99,6 +99,8 @@ struct minipod_config {
 	bool oscillator_factory_settings;
 	/** Set the track only mode */
 	bool tracking_only;
+	/** file path to store temperature fine table */
+	char *fine_table_output_path;
 };
 
 /**

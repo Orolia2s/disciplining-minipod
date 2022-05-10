@@ -418,6 +418,21 @@ static int init_algorithm_state(struct od * od) {
 	else
 		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
+
+	/* Init fine_circular_buffer */
+	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
+		state->fine_buffer[i].buffer_length = 0;
+		state->fine_buffer[i].read_index = 0;
+		state->fine_buffer[i].write_index = 0;
+		state->fine_buffer->mean_fine_applied = 0;
+		state->fine_buffer->mean_fine_estimate_ES = 0.0;
+		int j;
+		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
+			state->fine_buffer[i].buffer[j].fine_applied = 0;
+			state->fine_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
+		}
+	}
+
 	return 0;
 }
 
@@ -848,6 +863,16 @@ int od_process(struct od *od, const struct od_input *input,
 					{
 						state->estimated_drift = react_coeff;
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
+
+						/* Add fine values into fine ciruclar buffer for temperature impact */
+						ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, input->temperature);
+						if (ret != 0) {
+							log_warn("Could not add data to buffer\n");
+						}
+						ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+						if (ret != 0) {
+							log_error("Error writing temperature table in %s", config->fine_table_output_path);
+						}
 					}
 					else
 					{
@@ -1051,6 +1076,16 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
+					/* Add fine values into fine ciruclar buffer for temperature impact */
+					ret = add_fine_from_temperature(state->fine_buffer, new_fine, state->estimated_equilibrium_ES, input->temperature);
+					if (ret != 0) {
+						log_warn("Could not add data to buffer\n");
+					}
+					ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+					if (ret != 0) {
+						log_error("Error writing temperature table in %s", config->fine_table_output_path);
+					}
+
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
 						abs(delta_fine) <= LOCK_LOW_RES_FREQUENCY_ERROR_MIN / fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9)) &&
@@ -1073,7 +1108,7 @@ int od_process(struct od *od, const struct od_input *input,
 				break;
 			}
 			case LOCK_HIGH_RESOLUTION:
-			{   
+			{
 				state->current_phase_convergence_count++;
 				log_debug("convergence_count: %d", state->current_phase_convergence_count);
 				if (state->current_phase_convergence_count  == UINT16_MAX)
@@ -1234,6 +1269,17 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+
+					/* Add fine values into fine ciruclar buffer for temperature impact */
+					ret = add_fine_from_temperature(state->fine_buffer, new_fine, state->estimated_equilibrium_ES, input->temperature);
+					if (ret != 0) {
+						log_warn("Could not add data to buffer\n");
+					}
+					ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+					if (ret != 0) {
+						log_error("Error writing temperature table in %s", config->fine_table_output_path);
+					}
+
 				} else {
 					log_warn("Low linear fit quality, applying estimated equilibrium");
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);

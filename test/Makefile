@@ -13,6 +13,9 @@ OBJS2 = test-minipod-lib.o
 EXE3 = test-checks
 OBJS3 = test-checks.o checks.o log.o
 
+EXE4 = test-fine-circular-buffer
+OBJS4 = test_fine_circular_buffer.o fine_circular_buffer.o log.o
+
 all: test-minipod test-utils-test test-checks test-checks-test
 
 test-minipod: test-minipod-lib
@@ -24,6 +27,9 @@ test-utils-test: $(EXE)
 test-checks-test: $(EXE3)
 	./test-checks
 
+test-fine-circular-buffer-test: $(EXE4)
+	./test-fine-circular-buffer
+
 $(EXE): $(OBJS)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
@@ -31,6 +37,9 @@ $(EXE2): $(OBJS2)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 $(EXE3): $(OBJS3)
+	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(EXE4): $(OBJS4)
 	$(C)  $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 test-utils.o : test-utils.c
@@ -45,8 +54,12 @@ log.o : ../src/log.c
 checks.o: ../src/checks.c
 	$(C) $(CPPFLAGS) -c $^ -o $@
 
+fine_circular_buffer.o: ../src/fine_circular_buffer.c
+	$(C) $(CPPFLAGS) -c $^ -o $@
+
 clean:
 	rm -f *.o
 	rm -f test-utils
 	rm -f test-minipod-lib
 	rm -rf test-checks
+	rm -rf test-fine-circular-buffer
