@@ -419,6 +419,8 @@ static int init_algorithm_state(struct od * od) {
 		state->fine_buffer[i].buffer_length = 0;
 		state->fine_buffer[i].read_index = 0;
 		state->fine_buffer[i].write_index = 0;
+		state->fine_buffer->mean_fine_applied = 0;
+		state->fine_buffer->mean_fine_estimate_ES = 0.0;
 		int j;
 		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
 			state->fine_buffer[i].buffer[j].fine_applied = 0;

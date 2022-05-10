@@ -90,6 +90,35 @@ int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATUR
     return ret;
 }
 
+int compute_mean_value(struct fine_circular_buffer *fine_buffer)
+{
+    if (!fine_buffer) {
+        log_error("Fine buffer is NULL");
+        return -EINVAL;
+    }
+
+    if (fine_buffer->buffer_length == 0) {
+        log_trace("empty buffer");
+        return -EINVAL;
+    }
+
+    fine_buffer->mean_fine_applied = 0;
+    fine_buffer->mean_fine_estimate_ES = 0.0;
+    struct fine_tuple tuple;
+
+    while (read_buffer(fine_buffer, &tuple) == 0) {
+        fine_buffer->mean_fine_applied += tuple.fine_applied;
+        fine_buffer->mean_fine_estimate_ES += tuple.fine_estimated_equilibrium_ES;
+    }
+
+    fine_buffer->mean_fine_applied = fine_buffer->mean_fine_applied / fine_buffer->buffer_length;
+    fine_buffer->mean_fine_estimate_ES = fine_buffer->mean_fine_estimate_ES / fine_buffer->buffer_length;
+
+    fine_buffer->read_index = 0;
+
+    return 0;
+}
+
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file)
 {
     FILE *fp;
@@ -125,6 +154,14 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         strcat(line, fine_estimated_char);
         strcat(line, "\n");
         fputs(line, fp);
+
+        if (compute_mean_value(&fine_buffer[i]) == 0)
+            log_debug("Mean temperature over range [%.1f, %.1f[ is fine applied: %.2f, fine_estimated_ES: %.2f",
+                (i + 2 * MIN_TEMPERATURE) / 2,
+                (i + 1 + 2 * MIN_TEMPERATURE) / 2,
+                fine_buffer[i].mean_fine_applied,
+                fine_buffer[i].mean_fine_estimate_ES
+            );
     }
 
     fclose(fp);

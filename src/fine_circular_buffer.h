@@ -47,6 +47,8 @@ struct fine_tuple {
 
 struct fine_circular_buffer {
     struct fine_tuple buffer[CIRCULAR_BUFFER_SIZE];
+    float mean_fine_applied;
+    float mean_fine_estimate_ES;
     int read_index;
     int write_index;
     int buffer_length;
@@ -56,5 +58,6 @@ int read_buffer(struct fine_circular_buffer *circular_buffer, struct fine_tuple 
 void print_tuples(struct fine_circular_buffer *circular_buffer);
 int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], uint16_t fine_applied, float fine_estimated_ES, double temp);
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file);
+int compute_mean_value(struct fine_circular_buffer *fine_buffer);
 
 #endif /* MINIPOD_FINE_CIRCULAR_BUFFER_H */
