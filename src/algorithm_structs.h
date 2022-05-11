@@ -151,12 +151,6 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
-	/** Smooth exponential factor for estimated equilibrium used during tracking phase */
-	float alpha_es_tracking;
-	/** Smooth exponential factor for estimated equilibrium used during lock low resolution phase */
-	float alpha_es_lock_low_res;
-	/** Smooth exponential factor for estimated equilibrium used during lock high resolution phase */
-	float alpha_es_lock_high_res;
 	float previous_freq_error;
 	/** MRO50's smoothed temperature over disciplining */
 	float mRO_EP_temperature;

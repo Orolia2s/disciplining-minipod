@@ -853,8 +853,7 @@ int od_process(struct od *od, const struct od_input *input,
 							config->reactivity_max,
 							config->reactivity_power
 						);
-					}
-					else {
+					} else {
 						r = get_reactivity(
 							fabs(mean_phase_error),
 							config->ref_fluctuations_ns,
@@ -862,7 +861,6 @@ int od_process(struct od *od, const struct od_input *input,
 							(int) TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX,
 							config->reactivity_power
 						);
-
 					}
 
 					float react_coeff = - mean_phase_error / r;
@@ -1673,33 +1671,29 @@ void od_destroy(struct od **od)
 int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	if (od == NULL || monitoring == NULL)
 		return -1;
-
-	if (od->minipod_config.tracking_only) {
-		monitoring->clock_class = state_clock_class[od->state.status];
-		monitoring->status = od->state.status;
-		if (od->state.current_phase_convergence_count > round(48.0 / od->state.alpha_es_tracking))
-			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
-	} else {
-		monitoring->clock_class = state_clock_class[od->state.status];
-		monitoring->status = od->state.status;
+	monitoring->clock_class = state_clock_class[od->state.status];
+	monitoring->status = od->state.status;
+	if ((od->minipod_config.tracking_only) &&
+		(od->state.current_phase_convergence_count >  round(48.0 / ALPHA_ES_TRACKING))) {
+		monitoring->clock_class = CLOCK_CLASS_LOCK;
 	}
 
 	switch(od->state.status) {
 		case TRACKING: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_tracking);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_TRACKING);
 			break;
 		}
 
 		case LOCK_LOW_RESOLUTION: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_low_res);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_LOCK_LOW_RES);
 			break;
 		}
 
 		case LOCK_HIGH_RESOLUTION: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_high_res);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_LOCK_HIGH_RES);
 			break;
 		}
 		default: {
