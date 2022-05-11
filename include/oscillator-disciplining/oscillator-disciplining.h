@@ -339,6 +339,9 @@ enum ClockClass {
 struct od_monitoring {
 	enum Disciplining_State status;
 	enum ClockClass clock_class;
+	int current_phase_convergence_count;
+	int valid_phase_convergence_threshold;
+	float convergence_progress;
 };
 
 int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring);
