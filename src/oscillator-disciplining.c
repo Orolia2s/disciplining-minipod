@@ -1411,5 +1411,32 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 		monitoring->clock_class = state_clock_class[od->state.status];
 		monitoring->status = od->state.status;
 	}
+
+	switch(od->state.status) {
+		case TRACKING: {
+			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
+			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_tracking);
+			break;
+		}
+
+		case LOCK_LOW_RESOLUTION: {
+			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
+			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_low_res);
+			break;
+		}
+
+		case LOCK_HIGH_RESOLUTION: {
+			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
+			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_high_res);
+			break;
+		}
+		default: {
+			monitoring->current_phase_convergence_count = -1;
+			monitoring->valid_phase_convergence_threshold = -1;
+		}
+	}
+
+	float progress = ((float) monitoring->current_phase_convergence_count / (float) monitoring->valid_phase_convergence_threshold) * 100.0;
+	monitoring->convergence_progress = (progress < 100.0 ? progress : 100.0);
 	return 0;
 }
