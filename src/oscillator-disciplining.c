@@ -960,7 +960,7 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Compensate pure frequency error only */
 					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))){
 						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
-						coeff = coeff > 0.9 ? 0.9 : coeff;
+						coeff = coeff > 0.8 ? 0.8 : coeff;
 					}
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
@@ -1144,7 +1144,7 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Compensate pure frequency error only */
 					if (frequency_error_std < fabs(frequency_error) && fabs(frequency_error) > fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))) {
 						coeff = 1.0 - fabs(frequency_error_std/frequency_error);
-						coeff = coeff > 0.9 ? 0.9 : coeff;
+						coeff = coeff > 0.8 ? 0.8 : coeff;
 					}
 					log_debug("Pure frequency coefficients: %f", coeff);
 					int16_t delta_fine = -round(coeff * frequency_error / (MRO_FINE_STEP_SENSITIVITY * 1.E9));
