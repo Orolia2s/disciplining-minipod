@@ -135,7 +135,7 @@ bool check_no_outlier(struct algorithm_input *inputs, int length, float mean_pha
 		return false;
 
 	for (i = 0; i < length; i ++) {
-		if (fabs(inputs[i].phase_error - mean_phase_error) > ref_fluctuation_ns) {
+		if (fabs(inputs[i].phase_error - mean_phase_error) > 1.5*ref_fluctuation_ns) {
 			log_warn("Outlier detected at index %d", i);
 			return false;
 		}
