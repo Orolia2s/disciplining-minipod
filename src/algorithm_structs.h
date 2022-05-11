@@ -67,7 +67,7 @@
 /**
  * @brief Maximum acceptable frequency error in ns per s in High resolution
  */
-#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.05
+#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.075
 /**
  * @brief Minimum frequency error in ns per s for fit resolution
  */
