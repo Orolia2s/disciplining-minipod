@@ -240,10 +240,10 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 	int i;
 	if (!inputs || length <= 0)
 		return;
-	char * str = calloc((length + 2) * 16, sizeof(char));
+	char * str = calloc((length + 2) * 22, sizeof(char));
 	strcat(str, "Inputs: [");
 	for (i = 0; i < length; i++) {
-		char float_num[14];
+		char float_num[20];
 		sprintf(float_num, "%.3f", inputs[i].phase_error);
 		strcat(str, float_num);
 		if (i < length -1)
