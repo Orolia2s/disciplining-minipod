@@ -757,7 +757,7 @@ int od_process(struct od *od, const struct od_input *input,
 								(0.5 * state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - (0.5 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
 						}
-						} else {
+						else {
 							state->estimated_equilibrium_ES =
 								(state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES);
