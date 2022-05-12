@@ -797,12 +797,16 @@ int od_process(struct od *od, const struct od_input *input,
 					float react_coeff = - mean_phase_error / r;
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
-					ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
-					if (ret != 0) {
-						log_error("Error computing fine value");
-						return ret;
+					state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + round(react_coeff/MRO_FINE_STEP_SENSITIVITY));
+					if (state->current_phase_convergence_count <= round(12 / state->alpha_es_tracking)){
+						ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
+						if (ret != 0) {
+							log_error("Error computing fine value");
+							return ret;
+						}
 					}
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
+
 
 					/* If fine estimated equilibrium ES is in tolerance range */
 					if ((uint32_t) round(state->estimated_equilibrium_ES) >= (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance &&
