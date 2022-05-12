@@ -750,6 +750,13 @@ int od_process(struct od *od, const struct od_input *input,
 							state->estimated_equilibrium_ES =
 								(2.0 * state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
+						}
+						else if (state->current_phase_convergence_count > round(12 / state->alpha_es_tracking)){
+							log_debug("slow smoothing convergence : 0.5* %f applied", state->alpha_es_tracking);
+							state->estimated_equilibrium_ES =
+								(0.5 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (0.5 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
+						}
 						} else {
 							state->estimated_equilibrium_ES =
 								(state->alpha_es_tracking * state->fine_ctrl_value
