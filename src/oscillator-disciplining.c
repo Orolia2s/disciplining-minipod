@@ -769,8 +769,8 @@ int od_process(struct od *od, const struct od_input *input,
 							log_info("Smoothing convergence reached");
 							state->estimated_drift = react_coeff;
 
-							/* Switch to LOCK_LOW_RESOLUTION_STATE if tracking_only is disabled */
-							if (!config->tracking_only) {
+							/* Switch to LOCK_LOW_RESOLUTION_STATE if tracking_only is disabled and survey in is completed*/
+							if (!config->tracking_only && input->survey_completed) {
 								set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 								set_state(state, LOCK_LOW_RESOLUTION);
 								return 0;
