@@ -756,14 +756,21 @@ int od_process(struct od *od, const struct od_input *input,
 							state->estimated_equilibrium_ES =
 								(2.0 * state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
-						} else {
+						}
+						else if (state->current_phase_convergence_count > round(12 / state->alpha_es_tracking)){
+							log_debug("slow smoothing convergence : 0.5* %f applied", state->alpha_es_tracking);
+							state->estimated_equilibrium_ES =
+								(0.5 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (0.5 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
+						}
+						else {
 							state->estimated_equilibrium_ES =
 								(state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - state->alpha_es_tracking) * state->estimated_equilibrium_ES);
 						}
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
-							state->current_phase_convergence_count = round(6.0 / state->alpha_es_tracking) + 1;
+							state->current_phase_convergence_count = round(12.0 / state->alpha_es_tracking) + 1;
 					} else {
 						/* We cannot compute a new estimated equilibrium, logging why */
 						log_warn("Estimated equilibrium will not be updated at this step, not updating convergence count as well");
@@ -1504,7 +1511,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	if (od->minipod_config.tracking_only) {
 		monitoring->clock_class = state_clock_class[od->state.status];
 		monitoring->status = od->state.status;
-		if (od->state.current_phase_convergence_count > round(6.0 / od->state.alpha_es_tracking))
+		if (od->state.current_phase_convergence_count > round(12.0 / od->state.alpha_es_tracking))
 			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
 	} else {
 		monitoring->clock_class = state_clock_class[od->state.status];
