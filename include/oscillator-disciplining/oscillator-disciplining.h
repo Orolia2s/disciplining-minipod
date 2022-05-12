@@ -173,6 +173,8 @@ struct od_input {
 	bool lock;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
+	/** Survey in successfully completed */
+	bool survey_completed;
 };
 
 /**
