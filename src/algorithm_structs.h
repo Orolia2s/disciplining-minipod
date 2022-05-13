@@ -152,6 +152,10 @@ struct algorithm_state {
 	/** Smooth exponential factor for estimated equilibrium used during lock high resolution phase */
 	float alpha_es_lock_high_res;
 	float previous_freq_error;
+	/** MRO50's smoothed temperature over disciplining */
+	float mRO_EP_temperature;
+	/** MRO50's smoothed temperature when entering holdover */
+	float holdover_mRO_EP_temperature;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */

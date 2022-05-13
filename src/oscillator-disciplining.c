@@ -72,6 +72,13 @@
 #define LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 3000
 
 /**
+ * @def ALPHA_ES_TEMPERATURE
+ * @brief smoothing constant for temperature
+ *
+ */
+#define ALPHA_ES_TEMPERATURE 0.1
+
+/**
  * @brief Window size used for each step
  *
  */
@@ -134,6 +141,12 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 	state->od_inputs_for_state = state_windows[new_state];
 	state->od_inputs_count = 0;
 	state->current_phase_convergence_count = 0;
+
+	/* Save smoothed temperature if entering holdover */
+	if (new_state == HOLDOVER) {
+		state->holdover_mRO_EP_temperature = state->mRO_EP_temperature;
+		log_debug("Smoothed temperature when entering holdover: %.1f", state->holdover_mRO_EP_temperature);
+	}
 }
 
 /**
@@ -295,6 +308,8 @@ static int init_algorithm_state(struct od * od) {
 	state->current_phase_convergence_count = 0;
 	state->previous_freq_error = 0.0;
 
+	state->mRO_EP_temperature = -100000.0;
+	state->holdover_mRO_EP_temperature = -100000.0;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -557,6 +572,17 @@ int od_process(struct od *od, const struct od_input *input,
 		state->inputs[state->od_inputs_count].phase_error
 	);
 	state->od_inputs_count++;
+
+	/* Update smoothed temperature */
+	if (state->mRO_EP_temperature < -273.15) {
+		/* Init temperature to first value */
+		state->mRO_EP_temperature = input->temperature;
+	} else {
+		/* Smoothly update temprature with new value */
+		state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * input->temperature
+			+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
+	}
+	log_debug("Smoothed temperature is now %.1f", state->mRO_EP_temperature);
 
 	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
 		status_string[od->state.status],
@@ -1220,7 +1246,10 @@ int od_process(struct od *od, const struct od_input *input,
 		} else {
 			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 			log_info("Applying estimated equilibrium until going out of holdover");
-			set_state(state, HOLDOVER);
+			if (state->status != HOLDOVER)
+				set_state(state, HOLDOVER);
+			else
+				log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
