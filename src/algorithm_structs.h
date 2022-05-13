@@ -155,6 +155,10 @@ struct algorithm_state {
 	int gnss_ko_count;
 	/* Timestamp at which we entered holdover */
 	time_t timestamp_entering_holdover;
+	/** MRO50's smoothed temperature over disciplining */
+	float mRO_EP_temperature;
+	/** MRO50's smoothed temperature when entering holdover */
+	float holdover_mRO_EP_temperature;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
