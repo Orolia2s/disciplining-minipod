@@ -75,6 +75,10 @@
  */
 #define LOCK_HIGH_RES_FREQUENCY_ERROR_MIN 0.0075
 /**
+ * @brief Maximum acceptable fine adjustment delta authorized in tracking-only final stage
+ */
+#define TRACKING_ONLY_FINE_DELTA_MAX 10
+/**
  * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
  * /!\ This value should be close to round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (4 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
  * Must be lower to LOCK_LOW_RES_FREQUENCY_ERROR_MAX / fabs(MRO_FINE_STEP_SENSITIVITY * 1.E9)

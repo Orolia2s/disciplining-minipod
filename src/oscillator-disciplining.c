@@ -56,7 +56,8 @@
  * @brief Number of inputs for tracking state
  */
 #define WINDOW_TRACKING 6
-#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 300
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN 180
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 360
 /**
  * @def WINDOW_LOCK_LOW_RESOLUTION
  * @brief Number of inputs for lock low resolution state
@@ -758,17 +759,18 @@ int od_process(struct od *od, const struct od_input *input,
 								(2.0 * state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - (2.0 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
 						}
-						else if (state->current_phase_convergence_count > round(12 / state->alpha_es_tracking)){
+						else if ((state->current_phase_convergence_count > round(6 / state->alpha_es_tracking)) &&
+							(state->current_phase_convergence_count <= round(24 / state->alpha_es_tracking))) {
 							log_debug("slow smoothing convergence : 0.5* %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
 								(0.5 * state->alpha_es_tracking * state->fine_ctrl_value
 								+ (1.0 - (0.5 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
 						}
 						else if (state->current_phase_convergence_count > round(24 / state->alpha_es_tracking)){
-							log_debug("slow smoothing convergence : 0.1* %f applied", state->alpha_es_tracking);
+							log_debug("final slow smoothing convergence : 0.25* %f applied", state->alpha_es_tracking);
 							state->estimated_equilibrium_ES =
-								(0.1 * state->alpha_es_tracking * state->fine_ctrl_value
-								+ (1.0 - (0.1 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
+								(0.25 * state->alpha_es_tracking * state->fine_ctrl_value
+								+ (1.0 - (0.25 * state->alpha_es_tracking)) * state->estimated_equilibrium_ES);
 						}
 						else {
 							state->estimated_equilibrium_ES =
@@ -805,11 +807,20 @@ int od_process(struct od *od, const struct od_input *input,
 							config->reactivity_max,
 							config->reactivity_power
 						);
+					} else {
+						r = get_reactivity(
+							fabs(mean_phase_error),
+							config->ref_fluctuations_ns,
+							(int) TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN,
+							(int) TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX,
+							config->reactivity_power
+						);
+
 					}
 					float react_coeff = - mean_phase_error / r;
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
-					state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9)));
+
 					if (state->current_phase_convergence_count <= round(12 / state->alpha_es_tracking)){
 						ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
 						if (ret != 0) {
@@ -817,6 +828,16 @@ int od_process(struct od *od, const struct od_input *input,
 							return ret;
 						}
 					}
+					else{
+						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
+						if (abs(delta_fine) > TRACKING_ONLY_FINE_DELTA_MAX) {
+							delta_fine = delta_fine < 0 ?
+								-TRACKING_ONLY_FINE_DELTA_MAX :
+								TRACKING_ONLY_FINE_DELTA_MAX;
+						}
+						state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + delta_fine);
+					}
+					
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
 
@@ -1317,7 +1338,6 @@ int od_process(struct od *od, const struct od_input *input,
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		/* else go into holdover mode if gnss is bad for 3 cycles */
 		} else {
-<<<<<<< HEAD
 			/* Wait 3 cycles with bad GNSS before really going into holdover
 			 * Only apply estimated equilibrium without really entering holdover
 			 * which will loose any progress in the states convergence
@@ -1333,14 +1353,7 @@ int od_process(struct od *od, const struct od_input *input,
 				log_warn("Bad GNSS: Waiting 3 bad cycles before entering holdover (%d/3)", state->gnss_ko_count);
 			}
 
-=======
-			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-			log_info("Applying estimated equilibrium until going out of holdover");
-			if (state->status != HOLDOVER)
-				set_state(state, HOLDOVER);
-			else
-				log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
->>>>>>> 0aa4373... Add smoothed temperature in state and save temperature when entering holdover
+			log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
