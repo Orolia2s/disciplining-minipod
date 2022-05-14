@@ -56,7 +56,8 @@
  * @brief Number of inputs for tracking state
  */
 #define WINDOW_TRACKING 6
-#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 300
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN 300
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 1000
 /**
  * @def WINDOW_LOCK_LOW_RESOLUTION
  * @brief Number of inputs for lock low resolution state
@@ -799,6 +800,16 @@ int od_process(struct od *od, const struct od_input *input,
 							config->reactivity_max,
 							config->reactivity_power
 						);
+					}
+					else {
+						r = get_reactivity(
+							fabs(mean_phase_error),
+							config->ref_fluctuations_ns,
+							(int) TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN,
+							(int) TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX,
+							config->reactivity_power
+						);
+
 					}
 					float react_coeff = - mean_phase_error / r;
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
