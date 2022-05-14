@@ -921,7 +921,7 @@ int od_process(struct od *od, const struct od_input *input,
 					return 0;
 				} else {
 					/* Phase error is superior to threshold, we need to do a phase jump */
-					if (state->current_phase_convergence_count <= round(6.0 / state->alpha_es_tracking)) {
+					if (state->current_phase_convergence_count <= round(12.0 / state->alpha_es_tracking)) {
 						/* Phase jump needed */
 						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
 					} else {
