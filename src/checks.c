@@ -85,7 +85,7 @@ enum gnss_state check_gnss_valid_over_cycle(struct algorithm_input *inputs, int 
 
 	if (gnss_invalid_counter == 0)
 		return GNSS_OK;
-	else if (gnss_invalid_counter < round(length / 3) && gnss_invalid_max_streak < GNSS_INVALID_MAX_STREAK)
+	else if (gnss_invalid_counter < 6 && gnss_invalid_max_streak < GNSS_INVALID_MAX_STREAK)
 		return GNSS_UNSTABLE;
 	else
 		return GNSS_KO;
