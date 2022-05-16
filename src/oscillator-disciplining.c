@@ -912,14 +912,17 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_drift = react_coeff;
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 
-						/* Add fine values into fine ciruclar buffer for temperature impact */
-						ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, input->temperature);
-						if (ret != 0) {
-							log_warn("Could not add data to buffer\n");
-						}
-						ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
-						if (ret != 0) {
-							log_error("Error writing temperature table in %s", config->fine_table_output_path);
+						/* Do not add temperature value at the beginning of tracking */
+						if (state->current_phase_convergence_count > round(6.0 / state->alpha_es_tracking)) {
+							/* Add fine values into fine ciruclar buffer for temperature impact */
+							ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, input->temperature);
+							if (ret != 0) {
+								log_warn("Could not add data to buffer\n");
+							}
+							ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+							if (ret != 0) {
+								log_error("Error writing temperature table in %s", config->fine_table_output_path);
+							}
 						}
 					}
 					else
