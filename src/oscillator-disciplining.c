@@ -595,15 +595,6 @@ int od_process(struct od *od, const struct od_input *input,
 	);
 	state->od_inputs_count++;
 
-	/* Update smoothed temperature */
-	if (state->mRO_EP_temperature < -273.15) {
-		/* Init temperature to first value */
-		state->mRO_EP_temperature = input->temperature;
-	} else {
-		/* Smoothly update temprature with new value */
-		state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * input->temperature
-			+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
-	}
 	log_debug("Smoothed temperature is now %.1f", state->mRO_EP_temperature);
 
 	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
@@ -617,9 +608,20 @@ int od_process(struct od *od, const struct od_input *input,
 	/* Check if we reached the number of inputs required to process state's step */
 	if (state->od_inputs_count == state->od_inputs_for_state) {
 		state->od_inputs_count = 0;
+
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
-		/* TODO: DELETE || od->state.status  == INIT)*/
+
+		/* Update smoothed temperature */
+		if (state->mRO_EP_temperature < -273.15) {
+			/* Init temperature to first value */
+			state->mRO_EP_temperature = input->temperature;
+		} else {
+			/* Smoothly update temprature with new value */
+			state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * input->temperature
+				+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
+		}
+
 		/* Check if GNSS state is valid and mro50 is locked */
 		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
