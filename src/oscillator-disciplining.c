@@ -789,6 +789,14 @@ int od_process(struct od *od, const struct od_input *input,
 							log_warn("Phase error diff is too high: %f >= %d",
 								fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error),
 								config->ref_fluctuations_ns);
+
+						/* Reset tracking state if convergence step is superior to value where phase jump is not allowed */
+						if (fabs(mean_phase_error) >= 1000 && state->current_phase_convergence_count > round(12.0 / state->alpha_es_tracking)) {
+							log_warn("Phase error drifting too much whereas convergence had progressed well, resetting Tracking state");
+							set_state(state, TRACKING);
+							set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+							return 0;
+						}
 					}
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
