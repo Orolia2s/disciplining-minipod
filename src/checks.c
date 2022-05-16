@@ -38,7 +38,7 @@
  * @brief Define wether gnss is considered as valid over a cycle of length steps
  * by checking the gnss valid flag each input has.
  * GNSS is considered Ok if all valid flags are true over cycle
- * GNSS is considered Unstabled if less that a 1/3 of valid flags are flase
+ * GNSS is considered Unstabled if less than 4 valid flags are flase
  * and the maximum streak of false values over the cycle is inferior to 10
  * GNSS is considered KO otherwise
  *
@@ -85,7 +85,7 @@ enum gnss_state check_gnss_valid_over_cycle(struct algorithm_input *inputs, int 
 
 	if (gnss_invalid_counter == 0)
 		return GNSS_OK;
-	else if (gnss_invalid_counter < 6 && gnss_invalid_max_streak < GNSS_INVALID_MAX_STREAK)
+	else if (gnss_invalid_counter < 4 && gnss_invalid_max_streak < GNSS_INVALID_MAX_STREAK)
 		return GNSS_UNSTABLE;
 	else
 		return GNSS_KO;
