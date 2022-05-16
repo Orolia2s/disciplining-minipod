@@ -56,8 +56,8 @@
  * @brief Number of inputs for tracking state
  */
 #define WINDOW_TRACKING 6
-#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN 300
-#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 1000
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MIN 180
+#define TRACKING_PHASE_CONVERGENCE_REACTIVITY_MAX 360
 /**
  * @def WINDOW_LOCK_LOW_RESOLUTION
  * @brief Number of inputs for lock low resolution state
