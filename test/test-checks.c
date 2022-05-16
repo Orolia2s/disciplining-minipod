@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 
     printf("Test condition which should lead to GNSS_UNSTABLE\n");
     /* Create a streak of 9 false values --> GNSS should be considered unstable */
-    for (i = 0; i < 9; i++) {
+    for (i = 0; i < 3; i++) {
         inputs[10+i].valid = false;
     }
     assert(check_gnss_valid_over_cycle(inputs, 40) == GNSS_UNSTABLE);
