@@ -305,6 +305,7 @@ static int init_algorithm_state(struct od * od) {
 	set_state(state, INIT);
 	state->calib = false;
 	state->fine_ctrl_value = 0;
+	state->gnss_ko_count = 0;
 
 	state->estimated_drift = 0;
 	state->current_phase_convergence_count = 0;
@@ -618,6 +619,7 @@ int od_process(struct od *od, const struct od_input *input,
 		/* Check if GNSS state is valid and mro50 is locked */
 		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
+			state->gnss_ko_count = 0;
 			if (od->state.status != CALIBRATION
 				&& (
 					config->calibrate_first
@@ -1332,14 +1334,25 @@ int od_process(struct od *od, const struct od_input *input,
 		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
 			log_warn("Unstable GNSS: Applying estimated equilibrium");
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
-		/* else go into holdover mode */
+		/* else go into holdover mode if gnss is bad for 3 cycles */
 		} else {
-			log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
-			log_info("Applying estimated equilibrium until going out of holdover");
-			if (state->status != HOLDOVER)
-				set_state(state, HOLDOVER);
-			else
-				log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
+			/* Wait 3 cycles with bad GNSS before really going into holdover
+			 * Only apply estimated equilibrium without really entering holdover
+			 * which will loose any progress in the states convergence
+			 */
+			state->gnss_ko_count++;
+			if (state->gnss_ko_count >= 3) {
+				log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+				log_info("Applying estimated equilibrium until going out of holdover");
+				if (state->status != HOLDOVER)
+					set_state(state, HOLDOVER);
+				else
+					log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
+
+			} else {
+				log_warn("Bad GNSS: Waiting 3 bad cycles before entering holdover (%d/3)", state->gnss_ko_count);
+			}
+
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		}
 	} else {
