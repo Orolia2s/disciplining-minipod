@@ -74,7 +74,7 @@ int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATUR
     }
 
     /* Compute index of fine_buffer value should be stored */
-    index = (int) floor(2 * (temp - MIN_TEMPERATURE));
+    index = (int) floor(STEPS_BY_DEGREE * (temp - MIN_TEMPERATURE));
 
     log_debug("Adding data at temperature %.2f in index %d", temp, index);
     struct fine_tuple tuple = {
@@ -155,10 +155,10 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         strcat(line, "\n");
         fputs(line, fp);
 
-        if (compute_mean_value(&fine_buffer[i]) == 0)
-            log_debug("Mean temperature over range [%.1f, %.1f[ is fine applied: %.2f, fine_estimated_ES: %.2f",
-                (i + 2 * MIN_TEMPERATURE) / 2,
-                (i + 1 + 2 * MIN_TEMPERATURE) / 2,
+        if (fine_buffer[i].buffer_length == CIRCULAR_BUFFER_SIZE && compute_mean_value(&fine_buffer[i]) == 0)
+            log_debug("Mean temperature over range [%.2f, %.2f[ is fine applied: %.2f, fine_estimated_ES: %.2f",
+                (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
+                (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
                 fine_buffer[i].mean_fine_applied,
                 fine_buffer[i].mean_fine_estimate_ES
             );
