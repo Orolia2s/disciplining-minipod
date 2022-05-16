@@ -31,14 +31,18 @@
 
 /**
  * @brief Number of temperature steps, starting at 20°C
- * Each step is a 0.5° range
+ * Each step is a 0.25° range
  */
-#define TEMPERATURE_STEPS 80
+#define TEMPERATURE_STEPS 160
+/**
+ * @brief Number of steps by degrees (1/ 0.25° range)
+ */
+#define STEPS_BY_DEGREE 4
 
 #define MIN_TEMPERATURE 20.0
 #define MAX_TEMPERATURE 60.0
 
-#define CIRCULAR_BUFFER_SIZE 30
+#define CIRCULAR_BUFFER_SIZE 50
 
 struct fine_tuple {
     float fine_estimated_equilibrium_ES;
