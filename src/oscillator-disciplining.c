@@ -730,19 +730,19 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					return 0;
 				}
+				/* Check inputs values does not contain any outlier */
+				if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
+					mean_phase_error, config->ref_fluctuations_ns))
+				{
+					log_warn("Outlier detected ! entering holdover");
+					set_state(state, HOLDOVER);
+					set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
+					return 0;
+				}
+
 				/* Check phase error is below threshold configured */
 				if (fabs(mean_phase_error) < (float) config->phase_jump_threshold_ns)
 				{
-					/* Check inputs values does not contain any outlier */
-					if (!check_no_outlier(state->inputs, state->od_inputs_for_state,
-						mean_phase_error, config->ref_fluctuations_ns))
-					{
-						log_warn("Outlier detected ! entering holdover");
-						set_state(state, HOLDOVER);
-						set_output(output, ADJUST_FINE,  (uint32_t) round(state->estimated_equilibrium_ES), 0);
-						return 0;
-					}
-
 					/*
 					 * Phase error is below reference and control value in midrange
 					 * We can compute a new estimated equilibrium
