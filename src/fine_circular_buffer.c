@@ -155,7 +155,7 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         strcat(line, "\n");
         fputs(line, fp);
 
-        if (compute_mean_value(&fine_buffer[i]) == 0)
+        if (fine_buffer[i].buffer_length == CIRCULAR_BUFFER_SIZE && compute_mean_value(&fine_buffer[i]) == 0)
             log_debug("Mean temperature over range [%.2f, %.2f[ is fine applied: %.2f, fine_estimated_ES: %.2f",
                 (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
                 (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
