@@ -152,6 +152,7 @@ struct algorithm_state {
 	/** Smooth exponential factor for estimated equilibrium used during lock high resolution phase */
 	float alpha_es_lock_high_res;
 	float previous_freq_error;
+	int gnss_ko_count;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
