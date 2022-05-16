@@ -1353,20 +1353,42 @@ int od_process(struct od *od, const struct od_input *input,
 			 * Only apply estimated equilibrium without really entering holdover
 			 * which will loose any progress in the states convergence
 			 */
+
+			float fine_applied_in_holdover = state->estimated_equilibrium_ES;
+
 			state->gnss_ko_count++;
 			if (state->gnss_ko_count >= 3) {
 				log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
 				log_info("Applying estimated equilibrium until going out of holdover");
-				if (state->status != HOLDOVER)
+				if (state->status != HOLDOVER) {
 					set_state(state, HOLDOVER);
-				else
+					// VERITABLE ENTREE EN HOLDOVER
+					// SAVE TEMPERATURE Holdover
+				} else {
+					// ICI ON est en Holdover
+					// Calcul du nouveau fine_applied_in_holdover
+					// input->temperature :  temp courante
+					// state->holdover_mRO_EP_temperature
+					// state->fine_buffer[TEMPERATURE_STEPS]
+
+					// T = 31.3 ==> [31.25, 31.5[
+					// compute_mean_value_for_temp()
+					// int X = 0
+					// if (compute_mean_value(&state->fine_buffer[X] == 0);
+					// fine_buffer[i].mean_fine_applied,
+					// fine_buffer[i].mean_fine_estimate_ES
+					float coeff = 9.0;
+					fine_applied_in_holdover = state->estimated_equilibrium_ES + coeff * (input->temperature - state->holdover_mRO_EP_temperature);
+					log_debug("fine_applied_in_holdover is %f", fine_applied_in_holdover);
 					log_debug("Temperature when entering holdover was %.1f", state->holdover_mRO_EP_temperature);
+
+				}
 
 			} else {
 				log_warn("Bad GNSS: Waiting 3 bad cycles before entering holdover (%d/3)", state->gnss_ko_count);
 			}
 
-			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
+			set_output(output, ADJUST_FINE, (uint32_t) round(fine_applied_in_holdover), 0);
 		}
 	} else {
 		set_output(output, NO_OP, 0, 0);
