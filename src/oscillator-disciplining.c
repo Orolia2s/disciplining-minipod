@@ -78,7 +78,7 @@
  * @brief smoothing constant for temperature
  *
  */
-#define ALPHA_ES_TEMPERATURE 0.1
+#define ALPHA_ES_TEMPERATURE 0.01
 
 /**
  * @brief Window size used for each step
