@@ -172,6 +172,25 @@ static void set_output(struct od_output *output, enum output_action action, uint
 }
 
 /**
+ * @brief Update smoothed temperature with new input value
+ *
+ * @param state
+ * @param temperature
+ */
+static void update_temperature(struct algorithm_state *state, float temperature)
+{
+	/* Update smoothed temperature */
+	if (state->mRO_EP_temperature < -273.15) {
+		/* Init temperature to first value */
+		state->mRO_EP_temperature = temperature;
+	} else {
+		/* Smoothly update temprature with new value */
+		state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * temperature
+			+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
+	}
+}
+
+/**
  * @brief Init ctrl points used by algorithm to compute relation between fine value applied and phase error expected
  *
  * @param state pointer to algorithm_state which points will be initialized
@@ -612,15 +631,7 @@ int od_process(struct od *od, const struct od_input *input,
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
 
-		/* Update smoothed temperature */
-		if (state->mRO_EP_temperature < -273.15) {
-			/* Init temperature to first value */
-			state->mRO_EP_temperature = input->temperature;
-		} else {
-			/* Smoothly update temprature with new value */
-			state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * input->temperature
-				+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
-		}
+		update_temperature(state, input->temperature);
 
 		/* Check if GNSS state is valid and mro50 is locked */
 		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
