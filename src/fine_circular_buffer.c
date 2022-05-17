@@ -140,7 +140,7 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
             char temp_ES[32] = { 0 };
             sprintf(temp, ",%u", tuple.fine_applied);
             strcat(fine_applied_char, temp);
-            sprintf(temp_ES, ",%.1f", tuple.fine_estimated_equilibrium_ES);
+            sprintf(temp_ES, ",%.2f", tuple.fine_estimated_equilibrium_ES);
             strcat(fine_estimated_char, temp_ES);
         }
 
@@ -148,7 +148,7 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
 
         char line[4096] = { '\0' };
         char temp[32] = { '\0' };
-        sprintf(temp, "%.1f", MIN_TEMPERATURE + i * 0.5);
+        sprintf(temp, "%.2f", MIN_TEMPERATURE + i * 0.5);
         strcat(line, temp);
         strcat(line, fine_applied_char);
         strcat(line, fine_estimated_char);

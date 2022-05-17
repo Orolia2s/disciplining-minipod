@@ -151,7 +151,7 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 		state->timestamp_entering_holdover = time(NULL);
 		/* Save smoothed temperature if entering holdover */
 		state->holdover_mRO_EP_temperature = state->mRO_EP_temperature;
-		log_debug("Smoothed temperature when entering holdover: %.1f", state->holdover_mRO_EP_temperature);
+		log_debug("Smoothed temperature when entering holdover: %.2f", state->holdover_mRO_EP_temperature);
 	}
 }
 
@@ -595,7 +595,7 @@ int od_process(struct od *od, const struct od_input *input,
 	);
 	state->od_inputs_count++;
 
-	log_debug("Smoothed temperature is now %.1f", state->mRO_EP_temperature);
+	log_debug("Smoothed temperature is now %.2f", state->mRO_EP_temperature);
 
 	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
 		status_string[od->state.status],
