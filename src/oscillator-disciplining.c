@@ -724,7 +724,8 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Set fine value to estimated equilibrium */
 					set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					set_state(state, TRACKING);
-					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium);
+					state->fine_ctrl_value = state->estimated_equilibrium_ES;
+					log_info("INITIALIZATION: Applying estimated fine equilibrium setpoint %d", state->estimated_equilibrium_ES);
 				}
 				return 0;
 				break;
