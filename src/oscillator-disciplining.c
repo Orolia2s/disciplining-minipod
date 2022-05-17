@@ -279,6 +279,24 @@ static int compute_fine_value(struct algorithm_state *state, float react_coeff, 
 	return 0;
 }
 
+static float get_tracking_smooth_coefficient(struct algorithm_state *state)
+{
+	float coefficient = 1.0;
+
+	if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
+		log_debug("fast smoothing convergence : 2.0 * %f applied", ALPHA_ES_TRACKING);
+		coefficient = 2.0;
+	} else if ((state->current_phase_convergence_count > round(6 / ALPHA_ES_TRACKING))
+		&& (state->current_phase_convergence_count <= round(24 / ALPHA_ES_TRACKING))) {
+		log_debug("slow smoothing convergence : 0.5* %f applied", ALPHA_ES_TRACKING);
+		coefficient = 0.5;
+	} else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
+		log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
+		coefficient = 0.25;
+	}
+
+	return coefficient * ALPHA_ES_TRACKING;
+}
 /**
  * @brief Print inputs' phase error
  *
@@ -774,30 +792,11 @@ int od_process(struct od *od, const struct od_input *input,
 						&& fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
-						if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
-							log_debug("fast smoothing convergence : 2.0 * %f applied", ALPHA_ES_TRACKING);
-							state->estimated_equilibrium_ES =
-								(2.0 * ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - (2.0 * ALPHA_ES_TRACKING)) * state->estimated_equilibrium_ES);
-						}
-						else if ((state->current_phase_convergence_count > round(6 / ALPHA_ES_TRACKING)) &&
-							(state->current_phase_convergence_count <= round(24 / ALPHA_ES_TRACKING))) {
-							log_debug("slow smoothing convergence : 0.5* %f applied", ALPHA_ES_TRACKING);
-							state->estimated_equilibrium_ES =
-								(0.5 * ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - (0.5 * ALPHA_ES_TRACKING)) * state->estimated_equilibrium_ES);
-						}
-						else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
-							log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
-							state->estimated_equilibrium_ES =
-								(0.25 * ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - (0.25 * ALPHA_ES_TRACKING)) * state->estimated_equilibrium_ES);
-						}
-						else {
-							state->estimated_equilibrium_ES =
-								(ALPHA_ES_TRACKING * state->fine_ctrl_value
-								+ (1.0 - ALPHA_ES_TRACKING) * state->estimated_equilibrium_ES);
-						}
+						float smoothing_coefficient = get_tracking_smooth_coefficient(state);
+						state->estimated_equilibrium_ES =
+							(smoothing_coefficient * state->fine_ctrl_value
+							+ (1.0 - smoothing_coefficient) * state->estimated_equilibrium_ES);
+
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
 							state->current_phase_convergence_count = round(48.0 / ALPHA_ES_TRACKING) + 1;
