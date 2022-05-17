@@ -77,13 +77,6 @@
 #define DAY_IN_SECONDS 86400
 
 /**
- * @def ALPHA_ES_TEMPERATURE
- * @brief smoothing constant for temperature
- *
- */
-#define ALPHA_ES_TEMPERATURE 0.01
-
-/**
  * @def ALPHA_ES_TRACKING
  * @brief  smoothing constant for tracking state
  */
@@ -193,7 +186,7 @@ static void set_output(struct od_output *output, enum output_action action, uint
  * @param state
  * @param temperature
  */
-static void update_temperature(struct algorithm_state *state, float temperature)
+static void update_temperature(struct algorithm_state *state, float temperature, float smoothing_coefficient)
 {
 	/* Update smoothed temperature */
 	if (state->mRO_EP_temperature < -273.15) {
@@ -201,8 +194,8 @@ static void update_temperature(struct algorithm_state *state, float temperature)
 		state->mRO_EP_temperature = temperature;
 	} else {
 		/* Smoothly update temprature with new value */
-		state->mRO_EP_temperature = ALPHA_ES_TEMPERATURE * temperature
-			+ (1 - ALPHA_ES_TEMPERATURE) * state->mRO_EP_temperature;
+		state->mRO_EP_temperature = smoothing_coefficient * temperature
+			+ (1 - smoothing_coefficient) * state->mRO_EP_temperature;
 	}
 }
 
@@ -283,23 +276,33 @@ static int compute_fine_value(struct algorithm_state *state, float react_coeff, 
 	return 0;
 }
 
-static float get_tracking_smooth_coefficient(struct algorithm_state *state)
+static float get_smooth_coefficient(struct algorithm_state *state)
 {
 	float coefficient = 1.0;
 
-	if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
-		log_debug("fast smoothing convergence : 2.0 * %f applied", ALPHA_ES_TRACKING);
-		coefficient = 2.0;
-	} else if ((state->current_phase_convergence_count > round(6 / ALPHA_ES_TRACKING))
-		&& (state->current_phase_convergence_count <= round(24 / ALPHA_ES_TRACKING))) {
-		log_debug("slow smoothing convergence : 0.5* %f applied", ALPHA_ES_TRACKING);
-		coefficient = 0.5;
-	} else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
-		log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
-		coefficient = 0.25;
+	switch(state->status) {
+	case TRACKING:
+		if (state->current_phase_convergence_count <= round(1.0 / ALPHA_ES_TRACKING)) {
+			log_debug("fast smoothing convergence : 2.0 * %f applied", ALPHA_ES_TRACKING);
+			coefficient = 2.0;
+		} else if ((state->current_phase_convergence_count > round(6 / ALPHA_ES_TRACKING))
+			&& (state->current_phase_convergence_count <= round(24 / ALPHA_ES_TRACKING))) {
+			log_debug("slow smoothing convergence : 0.5* %f applied", ALPHA_ES_TRACKING);
+			coefficient = 0.5;
+		} else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
+			log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
+			coefficient = 0.25;
+		}
+
+		return coefficient * ALPHA_ES_TRACKING;
+	case LOCK_LOW_RESOLUTION:
+		return ALPHA_ES_LOCK_LOW_RES;
+	case LOCK_HIGH_RESOLUTION:
+		return ALPHA_ES_LOCK_HIGH_RES;
+	default:
+		return ALPHA_ES_TRACKING;
 	}
 
-	return coefficient * ALPHA_ES_TRACKING;
 }
 /**
  * @brief Print inputs' phase error
@@ -660,7 +663,8 @@ int od_process(struct od *od, const struct od_input *input,
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, state->od_inputs_for_state);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, state->od_inputs_for_state);
 
-		update_temperature(state, input->temperature);
+		float smoothing_coefficient = get_smooth_coefficient(state);
+		update_temperature(state, input->temperature, smoothing_coefficient);
 
 		/* Check if GNSS state is valid and mro50 is locked */
 		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
@@ -796,7 +800,7 @@ int od_process(struct od *od, const struct od_input *input,
 						&& fabs(state->inputs[WINDOW_TRACKING - 1].phase_error - state->inputs[0].phase_error)
 						< (float) config->ref_fluctuations_ns)
 					{
-						float smoothing_coefficient = get_tracking_smooth_coefficient(state);
+						/* Update estimated equilibrium ES and smoothed temperature according to smoothing coefficient */
 						state->estimated_equilibrium_ES =
 							(smoothing_coefficient * state->fine_ctrl_value
 							+ (1.0 - smoothing_coefficient) * state->estimated_equilibrium_ES);
@@ -1145,8 +1149,8 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						(ALPHA_ES_LOCK_LOW_RES * (new_fine - delta_fine_pcorr)
-						+ (1.0 - ALPHA_ES_LOCK_LOW_RES) * state->estimated_equilibrium_ES);
+						(smoothing_coefficient * (new_fine - delta_fine_pcorr)
+						+ (1.0 - smoothing_coefficient) * state->estimated_equilibrium_ES);
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
@@ -1339,8 +1343,8 @@ int od_process(struct od *od, const struct od_input *input,
 					set_output(output, ADJUST_FINE, new_fine, 0);
 					/* Update estimated equilibrium */
 					state->estimated_equilibrium_ES =
-						(ALPHA_ES_LOCK_HIGH_RES * (new_fine - delta_fine_pcorr)
-						+ (1.0 - ALPHA_ES_LOCK_HIGH_RES) * state->estimated_equilibrium_ES);
+						(smoothing_coefficient * (new_fine - delta_fine_pcorr)
+						+ (1.0 - smoothing_coefficient) * state->estimated_equilibrium_ES);
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
