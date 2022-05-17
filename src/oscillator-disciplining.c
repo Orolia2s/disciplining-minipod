@@ -1367,8 +1367,8 @@ int od_process(struct od *od, const struct od_input *input,
 				} else {
 					float fine_temperature_coeff = 8.0;
 					float delta_fine_temperature = 0.0;
-					if (fabs(state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) > 0.25){
-						delta_fine_temperature = fine_temperature_coeff*(state->mRO_EP_temperature - state->holdover_mRO_EP_temperature);
+					if (fabs(input->temperature - state->holdover_mRO_EP_temperature) > 0.25){
+						delta_fine_temperature = fine_temperature_coeff*(input->temperature - state->holdover_mRO_EP_temperature);
 						log_debug("delta_fine_temperature = %f", delta_fine_temperature);
 					}
 					fine_applied_in_holdover = state->estimated_equilibrium_ES + delta_fine_temperature;
