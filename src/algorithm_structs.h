@@ -153,6 +153,8 @@ struct algorithm_state {
 	float alpha_es_lock_high_res;
 	float previous_freq_error;
 	int gnss_ko_count;
+	/* Timestamp at which we entered holdover */
+	time_t timestamp_entering_holdover;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */
