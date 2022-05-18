@@ -1403,10 +1403,12 @@ int od_process(struct od *od, const struct od_input *input,
 					// if (compute_mean_value(&state->fine_buffer[X] == 0);
 					// fine_buffer[i].mean_fine_applied,
 					// fine_buffer[i].mean_fine_estimate_ES
-					float fine_temperature_coeff = 8.0;
+					float fine_temperature_coeff = 5.0;
 					float delta_fine_temperature = 0.0;
-					if (fabs(input->temperature - state->holdover_mRO_EP_temperature) > 0.25){
-						delta_fine_temperature = fine_temperature_coeff*(input->temperature - state->holdover_mRO_EP_temperature);
+					float dc = 0.5;
+					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
+					if (fabs(delta_temp_composite) > 0.25){
+						delta_fine_temperature = fine_temperature_coeff*(delta_temp_composite);
 						log_debug("delta_fine_temperature = %f", delta_fine_temperature);
 					}
 					fine_applied_in_holdover = state->estimated_equilibrium_ES + delta_fine_temperature;
