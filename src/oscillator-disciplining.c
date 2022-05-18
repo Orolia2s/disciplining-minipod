@@ -71,6 +71,9 @@
 #define WINDOW_LOCK_HIGH_RESOLUTION 606
 #define LOCK_HIGH_RESOLUTION_PHASE_CONVERGENCE_REACTIVITY 3000
 
+
+#define DAY_IN_SECONDS 86400
+
 /**
  * @brief Window size used for each step
  *
@@ -134,6 +137,10 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 	state->od_inputs_for_state = state_windows[new_state];
 	state->od_inputs_count = 0;
 	state->current_phase_convergence_count = 0;
+
+	if (new_state == HOLDOVER) {
+		state->timestamp_entering_holdover = time(NULL);
+	}
 }
 
 /**
@@ -1424,6 +1431,13 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	} else {
 		monitoring->clock_class = state_clock_class[od->state.status];
 		monitoring->status = od->state.status;
+	}
+
+	/* Special case: If we are in Holdover for more than 24H, set clock class to UNCALIBRATED */
+
+	if (od->state.status == HOLDOVER
+		&& time(NULL) - od->state.timestamp_entering_holdover > DAY_IN_SECONDS) {
+		monitoring->clock_class = CLOCK_CLASS_UNCALIBRATED;
 	}
 
 	switch(od->state.status) {
