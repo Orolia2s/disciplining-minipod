@@ -1660,14 +1660,11 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	if (od == NULL || monitoring == NULL)
 		return -1;
 
-	if (od->minipod_config.tracking_only) {
-		monitoring->clock_class = state_clock_class[od->state.status];
-		monitoring->status = od->state.status;
-		if (od->state.current_phase_convergence_count > round(48.0 / ALPHA_ES_TRACKING))
-			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
-	} else {
-		monitoring->clock_class = state_clock_class[od->state.status];
-		monitoring->status = od->state.status;
+	monitoring->clock_class = state_clock_class[od->state.status];
+	monitoring->status = od->state.status;
+	if ((od->minipod_config.tracking_only) &&
+		(od->state.current_phase_convergence_count >  round(48.0 / ALPHA_ES_TRACKING))) {
+		monitoring->clock_class = CLOCK_CLASS_LOCK;
 	}
 
 	/* Special case: If we are in Holdover for more than 24H, set clock class to UNCALIBRATED */
