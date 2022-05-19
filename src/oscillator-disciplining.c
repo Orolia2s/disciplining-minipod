@@ -942,9 +942,10 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 
 						/* Do not add temperature value at the beginning of tracking */
-						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)) {
+						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
+							&& fabs(mean_phase_error) <= 5.0 ) {
 							/* Add fine values into fine ciruclar buffer for temperature impact */
-							ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, input->temperature);
+							ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, state->mRO_EP_temperature);
 							if (ret != 0) {
 								log_warn("Could not add data to buffer\n");
 							}

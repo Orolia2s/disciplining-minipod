@@ -42,7 +42,7 @@
 #define MIN_TEMPERATURE 20.0
 #define MAX_TEMPERATURE 60.0
 
-#define CIRCULAR_BUFFER_SIZE 50
+#define CIRCULAR_BUFFER_SIZE 25
 
 struct fine_tuple {
     float fine_estimated_equilibrium_ES;
