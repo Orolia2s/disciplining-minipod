@@ -1663,7 +1663,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	if (od->minipod_config.tracking_only) {
 		monitoring->clock_class = state_clock_class[od->state.status];
 		monitoring->status = od->state.status;
-		if (od->state.current_phase_convergence_count > round(48.0 / od->state.alpha_es_tracking))
+		if (od->state.current_phase_convergence_count > round(48.0 / ALPHA_ES_TRACKING))
 			monitoring->clock_class = state_clock_class[LOCK_HIGH_RESOLUTION];
 	} else {
 		monitoring->clock_class = state_clock_class[od->state.status];
@@ -1679,19 +1679,19 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	switch(od->state.status) {
 		case TRACKING: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_tracking);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_TRACKING);
 			break;
 		}
 
 		case LOCK_LOW_RESOLUTION: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_low_res);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_LOCK_LOW_RES);
 			break;
 		}
 
 		case LOCK_HIGH_RESOLUTION: {
 			monitoring->current_phase_convergence_count = od->state.current_phase_convergence_count;
-			monitoring->valid_phase_convergence_threshold = round(6.0 / od->state.alpha_es_lock_high_res);
+			monitoring->valid_phase_convergence_threshold = round(6.0 / ALPHA_ES_LOCK_HIGH_RES);
 			break;
 		}
 		default: {
