@@ -165,6 +165,8 @@ struct algorithm_state {
 	/* Buffer to store fine estimated ES in temperature ranges */
 	struct fine_circular_buffer fine_estimated_es_buffer[TEMPERATURE_STEPS];
 	char fine_estimated_buffer_buffer_output_path[256];
+	/* Indicate tracking only is forced, wether by config or if SurveyIn does not complete */
+	bool tracking_only_forced;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */

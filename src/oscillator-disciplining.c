@@ -500,6 +500,9 @@ static int init_algorithm_state(struct od * od) {
 		}
 	}
 	sprintf(state->fine_estimated_buffer_buffer_output_path, "%s/fine_estimated_es_table.txt", config->fine_table_output_path);
+
+	/* Init force_tracking_only to value in config */
+	state->tracking_only_forced = config->tracking_only;
 	return 0;
 }
 
@@ -647,6 +650,14 @@ int od_process(struct od *od, const struct od_input *input,
 	struct algorithm_state *state = &(od->state);
 	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
 	struct minipod_config *config = &(od->minipod_config);
+
+	/* If tracking only is not forced by configuration
+	 * SurveyIn must be completed for lock low/high resolution to be accessible
+	 */
+	if (!config->tracking_only) {
+		state->tracking_only_forced = !input->survey_completed;
+	}
+
 
 	/* Reset output structure */
 	set_output(output, NO_OP, 0, 0);
@@ -908,7 +919,7 @@ int od_process(struct od *od, const struct od_input *input,
 							state->estimated_drift = react_coeff;
 
 							/* Switch to LOCK_LOW_RESOLUTION_STATE if tracking_only is disabled and survey in is completed*/
-							if (!config->tracking_only && input->survey_completed) {
+							if (!state->tracking_only_forced) {
 								set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 								set_state(state, LOCK_LOW_RESOLUTION);
 								return 0;
@@ -1662,8 +1673,8 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 
 	monitoring->clock_class = state_clock_class[od->state.status];
 	monitoring->status = od->state.status;
-	if ((od->minipod_config.tracking_only) &&
-		(od->state.current_phase_convergence_count >  round(48.0 / ALPHA_ES_TRACKING))) {
+	if ((od->state.tracking_only_forced) &&
+		(od->state.current_phase_convergence_count >  round(6.0 / ALPHA_ES_TRACKING))) {
 		monitoring->clock_class = CLOCK_CLASS_LOCK;
 	}
 
