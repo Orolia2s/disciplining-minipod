@@ -1411,7 +1411,7 @@ int od_process(struct od *od, const struct od_input *input,
 						delta_fine_temperature = fine_temperature_coeff*(delta_temp_composite);
 						log_debug("delta_fine_temperature = %f", delta_fine_temperature);
 					}
-					fine_applied_in_holdover = state->estimated_equilibrium_ES + delta_fine_temperature;
+					fine_applied_in_holdover = state->estimated_equilibrium_ES - delta_fine_temperature;
 					log_debug("fine_applied_in_holdover is %f", fine_applied_in_holdover);
 					log_debug("Temperature when entering holdover was %.2f", state->holdover_mRO_EP_temperature);
 
