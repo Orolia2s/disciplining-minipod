@@ -468,20 +468,34 @@ static int init_algorithm_state(struct od * od) {
 		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
 
-	/* Init fine_circular_buffer */
+	/* Init fine_circular_buffers */
+	/* Fine Applied buffer */
 	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
-		state->fine_buffer[i].buffer_length = 0;
-		state->fine_buffer[i].read_index = 0;
-		state->fine_buffer[i].write_index = 0;
-		state->fine_buffer->mean_fine_applied = 0;
-		state->fine_buffer->mean_fine_estimate_ES = 0.0;
+		state->fine_applied_buffer[i].fine_type = 'A';
+		state->fine_applied_buffer[i].buffer_length = 0;
+		state->fine_applied_buffer[i].read_index = 0;
+		state->fine_applied_buffer[i].write_index = 0;
+		state->fine_applied_buffer->mean_fine = 0.0;
 		int j;
 		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
-			state->fine_buffer[i].buffer[j].fine_applied = 0;
-			state->fine_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
+			state->fine_applied_buffer[i].buffer[j].fine_applied = 0;
 		}
 	}
+	sprintf(state->fine_applied_buffer_output_path, "%s/fine_applied_table.txt", config->fine_table_output_path);
 
+	/* Fine Applied buffer */
+	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
+		state->fine_estimated_es_buffer[i].fine_type = 'S';
+		state->fine_estimated_es_buffer[i].buffer_length = 0;
+		state->fine_estimated_es_buffer[i].read_index = 0;
+		state->fine_estimated_es_buffer[i].write_index = 0;
+		state->fine_estimated_es_buffer->mean_fine = 0.0;
+		int j;
+		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
+			state->fine_estimated_es_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
+		}
+	}
+	sprintf(state->fine_estimated_buffer_buffer_output_path, "%s/fine_estimated_es_table.txt", config->fine_table_output_path);
 	return 0;
 }
 
@@ -941,16 +955,35 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 
 						/* Do not add temperature value at the beginning of tracking */
-						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
-							&& fabs(mean_phase_error) <= 5.0 ) {
-							/* Add fine values into fine ciruclar buffer for temperature impact */
-							ret = add_fine_from_temperature(state->fine_buffer, state->fine_ctrl_value, state->estimated_equilibrium_ES, state->mRO_EP_temperature);
+						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)) {
+							/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
+							log_debug("Add fine estimated ES");
+							union fine_value fine_estimated_es = {
+								.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+							};
+							ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
 							if (ret != 0) {
-								log_warn("Could not add data to buffer\n");
+								log_warn("Could not add data to fine_estimated_es_buffer\n");
 							}
-							ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+							ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
 							if (ret != 0) {
-								log_error("Error writing temperature table in %s", config->fine_table_output_path);
+								log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+							}
+
+							if (fabs(mean_phase_error) < 5.0) {
+								log_debug("Add fine applied ES");
+								/* Add fine applied value into fine circular buffer for temperature impact */
+								union fine_value fine_applied = {
+									.fine_applied = state->fine_ctrl_value
+								};
+								ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+								if (ret != 0) {
+									log_warn("Could not add data to fine_applied_buffer\n");
+								}
+								ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+								if (ret != 0) {
+									log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+								}
 							}
 						}
 					}
@@ -1157,14 +1190,34 @@ int od_process(struct od *od, const struct od_input *input,
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					/* Add fine values into fine ciruclar buffer for temperature impact */
-					ret = add_fine_from_temperature(state->fine_buffer, new_fine, state->estimated_equilibrium_ES, input->temperature);
+					/* Add fine Estimated ES values into fine circular buffer for temperature impact */
+					union fine_value fine_estimated_es = {
+						.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+					};
+					ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
 					if (ret != 0) {
-						log_warn("Could not add data to buffer\n");
+						log_warn("Could not add data to fine_estimated_es_buffer\n");
 					}
-					ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+					ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
 					if (ret != 0) {
-						log_error("Error writing temperature table in %s", config->fine_table_output_path);
+						log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
 					}
+
+					if (fabs(mean_phase_error) < 5.0) {
+						/* Add fine applied value into fine circular buffer for temperature impact */
+						union fine_value fine_applied = {
+							.fine_applied = state->fine_ctrl_value
+						};
+						ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+						if (ret != 0) {
+							log_warn("Could not add data to fine_applied_buffer\n");
+						}
+						ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+						if (ret != 0) {
+							log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+						}
+					}
+
 
 					/* Check wether high resolution has been reached */
 					if (fabs(frequency_error) < LOCK_LOW_RES_FREQUENCY_ERROR_MIN &&
@@ -1350,14 +1403,32 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
-					/* Add fine values into fine ciruclar buffer for temperature impact */
-					ret = add_fine_from_temperature(state->fine_buffer, new_fine, state->estimated_equilibrium_ES, input->temperature);
+					/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
+					union fine_value fine_estimated_es = {
+						.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+					};
+					ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
 					if (ret != 0) {
-						log_warn("Could not add data to buffer\n");
+						log_warn("Could not add data to fine_estimated_es_buffer\n");
 					}
-					ret = write_buffers_in_file(state->fine_buffer, config->fine_table_output_path);
+					ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
 					if (ret != 0) {
-						log_error("Error writing temperature table in %s", config->fine_table_output_path);
+						log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+					}
+
+					if (fabs(mean_phase_error) < 5.0) {
+						/* Add fine applied value into fine circular buffer for temperature impact */
+						union fine_value fine_applied = {
+							.fine_applied = state->fine_ctrl_value
+						};
+						ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+						if (ret != 0) {
+							log_warn("Could not add data to fine_applied_buffer\n");
+						}
+						ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+						if (ret != 0) {
+							log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+						}
 					}
 
 				} else {

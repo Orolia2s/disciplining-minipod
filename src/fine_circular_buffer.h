@@ -44,23 +44,22 @@
 
 #define CIRCULAR_BUFFER_SIZE 25
 
-struct fine_tuple {
+union fine_value {
     float fine_estimated_equilibrium_ES;
     uint16_t fine_applied;
 };
 
 struct fine_circular_buffer {
-    struct fine_tuple buffer[CIRCULAR_BUFFER_SIZE];
-    float mean_fine_applied;
-    float mean_fine_estimate_ES;
+    union fine_value buffer[CIRCULAR_BUFFER_SIZE];
+    char fine_type; // 'A' for fine applied, 'S' for smoothed
+    float mean_fine;
     int read_index;
     int write_index;
     int buffer_length;
 };
 
-int read_buffer(struct fine_circular_buffer *circular_buffer, struct fine_tuple *returned_value);
 void print_tuples(struct fine_circular_buffer *circular_buffer);
-int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], uint16_t fine_applied, float fine_estimated_ES, double temp);
+int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp);
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file);
 int compute_mean_value(struct fine_circular_buffer *fine_buffer);
 

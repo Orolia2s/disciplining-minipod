@@ -162,7 +162,10 @@ struct algorithm_state {
 	float mRO_EP_temperature;
 	/** MRO50's smoothed temperature when entering holdover */
 	float holdover_mRO_EP_temperature;
-	struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS];
+	struct fine_circular_buffer fine_applied_buffer[TEMPERATURE_STEPS];
+	char fine_applied_buffer_output_path[256];
+	struct fine_circular_buffer fine_estimated_es_buffer[TEMPERATURE_STEPS];
+	char fine_estimated_buffer_buffer_output_path[256];
 	int gnss_ko_count;
 };
 
