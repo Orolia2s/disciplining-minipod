@@ -167,6 +167,8 @@ struct algorithm_state {
 	char fine_estimated_buffer_buffer_output_path[256];
 	/* Indicate tracking only is forced, wether by config or if SurveyIn does not complete */
 	bool tracking_only_forced;
+	/* Indicate wether going in Holdover state should display Holdover Clock Class or Uncalibrated */
+	bool ready_to_go_in_holdover_class;
 };
 
 #endif /* ALGORITHM_STRUCTS_H */

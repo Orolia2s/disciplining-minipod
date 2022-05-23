@@ -160,7 +160,14 @@ static void set_state(struct algorithm_state *state, enum Disciplining_State new
 		state->timestamp_entering_holdover = time(NULL);
 		/* Save smoothed temperature if entering holdover */
 		state->holdover_mRO_EP_temperature = state->mRO_EP_temperature;
+
 		log_debug("Smoothed temperature when entering holdover: %.2f", state->holdover_mRO_EP_temperature);
+	} else if (new_state == TRACKING) {
+		/* Reset ready to go in holdover */
+		state->ready_to_go_in_holdover_class = false;
+	} else if (new_state == LOCK_HIGH_RESOLUTION) {
+		/* Set ready to go in holdover */
+		state->ready_to_go_in_holdover_class = true;
 	}
 }
 
@@ -368,6 +375,8 @@ static int init_algorithm_state(struct od * od) {
 
 	state->mRO_EP_temperature = -100000.0;
 	state->holdover_mRO_EP_temperature = -100000.0;
+
+	state->ready_to_go_in_holdover_class = false;
 
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_LOCK_HIGH_RESOLUTION * sizeof(struct algorithm_input));
@@ -833,6 +842,10 @@ int od_process(struct od *od, const struct od_input *input,
 						state->current_phase_convergence_count++;
 						if (state->current_phase_convergence_count  == UINT16_MAX)
 							state->current_phase_convergence_count = round(48.0 / ALPHA_ES_TRACKING) + 1;
+
+						/* Update ready to go in holdover variable */
+						if (state->current_phase_convergence_count > round(48.0 / ALPHA_ES_TRACKING))
+							state->ready_to_go_in_holdover_class = true;
 					} else {
 						/* We cannot compute a new estimated equilibrium, logging why */
 						log_warn("Estimated equilibrium will not be updated at this step, not updating convergence count as well");
@@ -1680,7 +1693,9 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 
 	/* Special case: If we are in Holdover for more than 24H, set clock class to UNCALIBRATED */
 	if (od->state.status == HOLDOVER
-		&& time(NULL) - od->state.timestamp_entering_holdover > DAY_IN_SECONDS) {
+		&& (!od->state.ready_to_go_in_holdover_class
+			|| time(NULL) - od->state.timestamp_entering_holdover > DAY_IN_SECONDS)
+	) {
 		monitoring->clock_class = CLOCK_CLASS_UNCALIBRATED;
 	}
 
