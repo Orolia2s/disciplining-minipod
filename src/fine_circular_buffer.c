@@ -5,7 +5,7 @@
 #include "math.h"
 #include "string.h"
 
-static int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine)
+int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine)
 {
     if (!circular_buffer) {
         log_error("Circular buffer is NULL");
@@ -127,6 +127,12 @@ int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATUR
     return ret;
 }
 
+/**
+ * @brief Compute mean value over circular buffer if there are more than MIN_VALUES_FOR_MEAN in buffer
+ *
+ * @param fine_buffer
+ * @return int 0 on success else error
+ */
 int compute_mean_value(struct fine_circular_buffer *fine_buffer)
 {
     if (!fine_buffer) {
@@ -140,25 +146,31 @@ int compute_mean_value(struct fine_circular_buffer *fine_buffer)
     }
 
     fine_buffer->mean_fine = 0.0;
-    union fine_value fine;
 
-    if (fine_buffer->fine_type == 'A') {
-        while (read_buffer(fine_buffer, &fine) == 0) {
-            fine_buffer->mean_fine += fine.fine_applied;
+    if (fine_buffer->buffer_length >= MIN_VALUES_FOR_MEAN) {
+        union fine_value fine;
+
+        if (fine_buffer->fine_type == 'A') {
+            while (read_buffer(fine_buffer, &fine) == 0) {
+                fine_buffer->mean_fine += fine.fine_applied;
+            }
+
+        } else if (fine_buffer->fine_type == 'S') {
+            while (read_buffer(fine_buffer, &fine) == 0) {
+                fine_buffer->mean_fine += fine.fine_estimated_equilibrium_ES;
+            }
+
+        } else {
+            log_error("Buffer is not of type 'A' or 'S'");
+            return -EINVAL;
         }
+        fine_buffer->mean_fine = fine_buffer->mean_fine / fine_buffer->buffer_length;
 
-    } else if (fine_buffer->fine_type == 'S') {
-        while (read_buffer(fine_buffer, &fine) == 0) {
-            fine_buffer->mean_fine += fine.fine_estimated_equilibrium_ES;
-        }
-
+        fine_buffer->read_index = 0;
     } else {
-        log_error("Buffer is not of type 'A' or 'S'");
-        return -EINVAL;
+        /*Not enough value to compute mean value */
+        return -1;
     }
-    fine_buffer->mean_fine = fine_buffer->mean_fine / fine_buffer->buffer_length;
-
-    fine_buffer->read_index = 0;
 
     return 0;
 }
@@ -302,7 +314,7 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         strcat(line, "\n");
         fputs(line, fp);
 
-        if (fine_buffer[i].buffer_length >= MIN_VALUES_FOR_MEAN && compute_mean_value(&fine_buffer[i]) == 0) {
+        if (compute_mean_value(&fine_buffer[i]) == 0) {
             if (fine_buffer->fine_type == 'A') {
                 log_debug("FINE APPLIED: Mean temperature over range [%.2f, %.2f[ is : %.2f",
                     (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,

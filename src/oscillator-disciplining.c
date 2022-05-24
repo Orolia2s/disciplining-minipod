@@ -338,22 +338,80 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 }
 
 /**
+ * @brief Initialize temperature table with value from disciplining_parameters
+ * 
+ * @param state 
+ * @param config 
+ */
+static void init_temperature_table(struct algorithm_state *state, struct minipod_config *config, struct disciplining_parameters *disciplining_parameters)
+{
+	int i;
+	int j;
+	/* Init fine_circular_buffers */
+	/* Fine Applied buffer */
+	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
+		state->fine_applied_buffer[i].fine_type = 'A';
+		state->fine_applied_buffer[i].buffer_length = 0;
+		state->fine_applied_buffer[i].read_index = 0;
+		state->fine_applied_buffer[i].write_index = 0;
+		state->fine_applied_buffer->mean_fine = 0.0;
+		int j;
+		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
+			state->fine_applied_buffer[i].buffer[j].fine_applied = 0;
+		}
+	}
+	sprintf(state->fine_applied_buffer_output_path, "%s/fine_applied_table.txt", config->fine_table_output_path);
+
+	/* Fine Estimated ES buffer */
+	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
+		state->fine_estimated_es_buffer[i].fine_type = 'S';
+		state->fine_estimated_es_buffer[i].buffer_length = 0;
+		state->fine_estimated_es_buffer[i].read_index = 0;
+		state->fine_estimated_es_buffer[i].write_index = 0;
+		state->fine_estimated_es_buffer->mean_fine = 0.0;
+		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
+			state->fine_estimated_es_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
+		}
+	}
+
+	for (i = 0; i < MEAN_TEMPERATURE_ARRAY_MAX; i++) {
+		union fine_value fine = {
+			.fine_estimated_equilibrium_ES = (float) disciplining_parameters->mean_fine_over_temperature[i] / 10.0
+		};
+		if (fine.fine_estimated_equilibrium_ES >= FINE_MID_RANGE_MIN + config->fine_stop_tolerance
+			&& fine.fine_estimated_equilibrium_ES <= FINE_MID_RANGE_MAX - config->fine_stop_tolerance) {
+			log_debug("Writing mean value of %.2f in temperature range [%.2f, %.2f[",
+				fine.fine_estimated_equilibrium_ES,
+				(i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
+				(i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE);
+			for (j = 0; j < MIN_VALUES_FOR_MEAN; j++) {
+				if (write_fine(&state->fine_estimated_es_buffer[i], fine) != 0) {
+					log_error("Could not write value in buffer for temperature [%.2f, %.2f[",
+						(i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
+						(i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE);
+				}
+			}
+		}
+	}
+	sprintf(state->fine_estimated_buffer_buffer_output_path, "%s/fine_estimated_es_table.txt", config->fine_table_output_path);
+}
+
+/**
  * @brief Initialize algorithm state with disciplining_parameters and minipod config
  *
  * @param od library context
  * @return int 0 on sucess else error
  */
 static int init_algorithm_state(struct od * od) {
-	int ret;
 	int i;
+	int ret;
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
 	struct minipod_config *config = &od->minipod_config;
 
 	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
-
 	/* Constant state values */
-	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
+	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;	
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
 
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
@@ -481,34 +539,7 @@ static int init_algorithm_state(struct od * od) {
 		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
 
-	/* Init fine_circular_buffers */
-	/* Fine Applied buffer */
-	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
-		state->fine_applied_buffer[i].fine_type = 'A';
-		state->fine_applied_buffer[i].buffer_length = 0;
-		state->fine_applied_buffer[i].read_index = 0;
-		state->fine_applied_buffer[i].write_index = 0;
-		state->fine_applied_buffer->mean_fine = 0.0;
-		int j;
-		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
-			state->fine_applied_buffer[i].buffer[j].fine_applied = 0;
-		}
-	}
-	sprintf(state->fine_applied_buffer_output_path, "%s/fine_applied_table.txt", config->fine_table_output_path);
-
-	/* Fine Applied buffer */
-	for (i = 0; i < TEMPERATURE_STEPS; i ++) {
-		state->fine_estimated_es_buffer[i].fine_type = 'S';
-		state->fine_estimated_es_buffer[i].buffer_length = 0;
-		state->fine_estimated_es_buffer[i].read_index = 0;
-		state->fine_estimated_es_buffer[i].write_index = 0;
-		state->fine_estimated_es_buffer->mean_fine = 0.0;
-		int j;
-		for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
-			state->fine_estimated_es_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
-		}
-	}
-	sprintf(state->fine_estimated_buffer_buffer_output_path, "%s/fine_estimated_es_table.txt", config->fine_table_output_path);
+	init_temperature_table(state, config, dsc_parameters);
 
 	/* Init force_tracking_only to value in config */
 	state->tracking_only_forced = config->tracking_only;
@@ -1489,7 +1520,6 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Temperature compensation */
 					float dc = 0.5;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
-
 					if (fabs(delta_temp_composite) > 0.25) {
 						float delta_fine_temperature = get_delta_fine_from_temperature_table(
 							state->fine_estimated_es_buffer,
@@ -1518,12 +1548,28 @@ int od_process(struct od *od, const struct od_input *input,
 	return 0;
 }
 
+static void update_temperature_mean_values(struct disciplining_parameters* disciplining_parameters, struct algorithm_state *state)
+{
+	int i;
+	/* Copy only range between 30 and 49 for now */
+	for (i = 0; i < MEAN_TEMPERATURE_ARRAY_MAX; i ++) {
+		if (compute_mean_value(&state->fine_estimated_es_buffer[i]) == 0) {
+			disciplining_parameters->mean_fine_over_temperature[i] = round(state->fine_estimated_es_buffer[i].mean_fine * 10.0);
+		} else {
+			disciplining_parameters->mean_fine_over_temperature[i] = 0;
+		}
+	}
+	return;
+}
+
 int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters* disciplining_parameters) {
 	if (od == NULL) {
 		log_error("Library context is null");
 		return -1;
 	}
+	/* Update temperature table values stored in disciplining parameters */
 	memcpy(disciplining_parameters, &od->dsc_parameters, sizeof(struct disciplining_parameters));
+	update_temperature_mean_values(disciplining_parameters, &od->state);
 	return 0;
 }
 

@@ -61,6 +61,7 @@ struct fine_circular_buffer {
 };
 
 void print_tuples(struct fine_circular_buffer *circular_buffer);
+int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine);
 int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp);
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file);
 int compute_mean_value(struct fine_circular_buffer *fine_buffer);

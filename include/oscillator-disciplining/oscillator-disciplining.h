@@ -108,6 +108,8 @@ struct minipod_config {
  */
 #define CALIBRATION_POINTS_MAX 10
 
+#define MEAN_TEMPERATURE_ARRAY_MAX 160
+
 /**
  * @struct disciplining parameters
  * @brief Disciplining parameters corresponding to mRO50 device disciplined
@@ -151,6 +153,7 @@ struct disciplining_parameters {
 	bool calibration_valid;
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
+	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
 };
 
 /**
