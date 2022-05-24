@@ -1686,6 +1686,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 
 	monitoring->clock_class = state_clock_class[od->state.status];
 	monitoring->status = od->state.status;
+	monitoring->ready_for_holdover = od->state.ready_to_go_in_holdover_class;
 	if ((od->state.tracking_only_forced) &&
 		(od->state.current_phase_convergence_count >  round(6.0 / ALPHA_ES_TRACKING))) {
 		monitoring->clock_class = CLOCK_CLASS_LOCK;
@@ -1718,7 +1719,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 			break;
 		}
 		default: {
-			monitoring->current_phase_convergence_count = -1;
+			monitoring->current_phase_convergence_count = 0;
 			monitoring->valid_phase_convergence_threshold = -1;
 		}
 	}

@@ -346,6 +346,7 @@ struct od_monitoring {
 	int current_phase_convergence_count;
 	int valid_phase_convergence_threshold;
 	float convergence_progress;
+	bool ready_for_holdover;
 };
 
 int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring);
