@@ -1486,7 +1486,7 @@ int od_process(struct od *od, const struct od_input *input,
 				if (state->status != HOLDOVER) {
 					set_state(state, HOLDOVER);
 				} else {
-					float fine_temperature_coeff = 3.0;
+					float fine_temperature_coeff = 5.0;
 					float delta_fine_temperature = 0.0;
 					float dc = 0.5;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
