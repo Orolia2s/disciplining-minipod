@@ -44,6 +44,8 @@
 
 #define CIRCULAR_BUFFER_SIZE 25
 
+#define MIN_VALUES_FOR_MEAN 10
+
 union fine_value {
     float fine_estimated_equilibrium_ES;
     uint16_t fine_applied;
@@ -62,5 +64,12 @@ void print_tuples(struct fine_circular_buffer *circular_buffer);
 int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp);
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file);
 int compute_mean_value(struct fine_circular_buffer *fine_buffer);
+int get_index_of_temperature(float temperature);
+float get_delta_fine_from_temperature_table(
+    struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS],
+    float input_temperature,
+    float holdover_mRO_EP_temperature,
+    float estimated_equilibrium_ES
+);
 
 #endif /* MINIPOD_FINE_CIRCULAR_BUFFER_H */

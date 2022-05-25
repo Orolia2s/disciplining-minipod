@@ -16,7 +16,7 @@ OBJS3 = test-checks.o checks.o log.o
 EXE4 = test-fine-circular-buffer
 OBJS4 = test_fine_circular_buffer.o fine_circular_buffer.o log.o
 
-all: test-minipod test-utils-test test-checks test-checks-test
+all: test-minipod test-utils-test test-checks test-checks-test test-fine-circular-buffer-test
 
 test-minipod: test-minipod-lib
 	LD_LIBRARY_PATH=/usr/lib:/usr/lib64:/usr/local/lib:/usr/local/lib64:/usr/local/lib/x86_64-linux-gnu ./test-minipod-lib
