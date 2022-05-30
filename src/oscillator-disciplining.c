@@ -1428,20 +1428,20 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
-					/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
-					union fine_value fine_estimated_es = {
-						.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
-					};
-					ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
-					if (ret != 0) {
-						log_warn("Could not add data to fine_estimated_es_buffer\n");
-					}
-					ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
-					if (ret != 0) {
-						log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
-					}
+					if (fabs(mean_phase_error) < 10.0) {
+						/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
+						union fine_value fine_estimated_es = {
+							.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+						};
+						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
+						if (ret != 0) {
+							log_warn("Could not add data to fine_estimated_es_buffer\n");
+						}
+						ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
+						if (ret != 0) {
+							log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+						}
 
-					if (fabs(mean_phase_error) < 5.0) {
 						/* Add fine applied value into fine circular buffer for temperature impact */
 						union fine_value fine_applied = {
 							.fine_applied = state->fine_ctrl_value
