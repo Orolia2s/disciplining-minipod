@@ -1527,8 +1527,15 @@ int od_process(struct od *od, const struct od_input *input,
 							state->holdover_mRO_EP_temperature,
 							state->estimated_equilibrium_ES
 						);
-						log_debug("Temperature Compensation: delta_temp_composite=%.2f, delta_fine=%.2f",
-								delta_temp_composite, delta_fine_temperature);
+						float effective_coefficient = delta_fine_temperature/delta_temp_composite;
+						log_debug("Temperature Compensation: delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
+								delta_temp_composite,
+								delta_fine_temperature,
+								effective_coefficient);
+						if (fabs(effective_coefficient) > 15.0) {
+							delta_fine_temperature = 15.0 * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
+							log_debug("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
+						}
 						fine_applied_in_holdover += delta_fine_temperature;
 					}
 
