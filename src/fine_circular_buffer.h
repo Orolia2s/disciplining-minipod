@@ -28,37 +28,7 @@
 #define MINIPOD_FINE_CIRCULAR_BUFFER_H
 
 #include "stdint.h"
-
-/**
- * @brief Number of temperature steps, starting at 20°C
- * Each step is a 0.25° range
- */
-#define TEMPERATURE_STEPS 160
-/**
- * @brief Number of steps by degrees (1/ 0.25° range)
- */
-#define STEPS_BY_DEGREE 4
-
-#define MIN_TEMPERATURE 20.0
-#define MAX_TEMPERATURE 60.0
-
-#define CIRCULAR_BUFFER_SIZE 25
-
-#define MIN_VALUES_FOR_MEAN 10
-
-union fine_value {
-    float fine_estimated_equilibrium_ES;
-    uint16_t fine_applied;
-};
-
-struct fine_circular_buffer {
-    union fine_value buffer[CIRCULAR_BUFFER_SIZE];
-    char fine_type; // 'A' for fine applied, 'S' for smoothed
-    float mean_fine;
-    int read_index;
-    int write_index;
-    int buffer_length;
-};
+#include "algorithm_structs.h"
 
 void print_tuples(struct fine_circular_buffer *circular_buffer);
 int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine);
@@ -72,5 +42,9 @@ float get_delta_fine_from_temperature_table(
     float holdover_mRO_EP_temperature,
     float estimated_equilibrium_ES
 );
+int find_closest_left_circular_buffer_from_index(struct fine_circular_buffer *fine_buffer, int temperature_index);
+int find_closest_right_circular_buffer_from_index(struct fine_circular_buffer *fine_buffer, int temperature_index);
+float get_fine_from_table(struct algorithm_state *state, float input_temperature);
+void update_mean_values(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS]);
 
 #endif /* MINIPOD_FINE_CIRCULAR_BUFFER_H */

@@ -28,8 +28,6 @@
 #include <stdint.h>
 #include <oscillator-disciplining/oscillator-disciplining.h>
 
-#include "fine_circular_buffer.h"
-
 /** mRO base fine step sensitivity */
 #define MRO_FINE_STEP_SENSITIVITY -3.E-12
 /** mRO base coarse step sensitivity */
@@ -95,6 +93,37 @@
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
  */
 #define DRIFT_COEFFICIENT_ABSOLUTE_MAX 7.2
+
+/**
+ * @brief Number of temperature steps, starting at 20°C
+ * Each step is a 0.25° range
+ */
+#define TEMPERATURE_STEPS 160
+/**
+ * @brief Number of steps by degrees (1/ 0.25° range)
+ */
+#define STEPS_BY_DEGREE 4
+
+#define MIN_TEMPERATURE 20.0
+#define MAX_TEMPERATURE 60.0
+
+#define CIRCULAR_BUFFER_SIZE 25
+
+#define MIN_VALUES_FOR_MEAN 10
+
+union fine_value {
+    float fine_estimated_equilibrium_ES;
+    uint16_t fine_applied;
+};
+
+struct fine_circular_buffer {
+    union fine_value buffer[CIRCULAR_BUFFER_SIZE];
+    char fine_type; // 'A' for fine applied, 'S' for smoothed
+    float mean_fine;
+    int read_index;
+    int write_index;
+    int buffer_length;
+};
 
 /**
  * @struct algorithm_inputs

@@ -41,6 +41,7 @@
 
 #include "algorithm_structs.h"
 #include "checks.h"
+#include "fine_circular_buffer.h"
 #include "log.h"
 #include "parameters.h"
 #include "phase.h"
@@ -1011,7 +1012,8 @@ int od_process(struct od *od, const struct od_input *input,
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 
 						/* Do not add temperature value at the beginning of tracking */
-						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)) {
+						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
+							&& fabs(mean_phase_error) <= 10.0) {
 							/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
 							log_debug("Add fine estimated ES");
 							union fine_value fine_estimated_es = {
@@ -1026,20 +1028,18 @@ int od_process(struct od *od, const struct od_input *input,
 								log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
 							}
 
-							if (fabs(mean_phase_error) < 5.0) {
-								log_debug("Add fine applied ES");
-								/* Add fine applied value into fine circular buffer for temperature impact */
-								union fine_value fine_applied = {
-									.fine_applied = state->fine_ctrl_value
-								};
-								ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
-								if (ret != 0) {
-									log_warn("Could not add data to fine_applied_buffer\n");
-								}
-								ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
-								if (ret != 0) {
-									log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
-								}
+							log_debug("Add fine applied ES");
+							/* Add fine applied value into fine circular buffer for temperature impact */
+							union fine_value fine_applied = {
+								.fine_applied = state->fine_ctrl_value
+							};
+							ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+							if (ret != 0) {
+								log_warn("Could not add data to fine_applied_buffer\n");
+							}
+							ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+							if (ret != 0) {
+								log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
 							}
 						}
 					}
@@ -1245,21 +1245,21 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
-					/* Add fine values into fine ciruclar buffer for temperature impact */
-					/* Add fine Estimated ES values into fine circular buffer for temperature impact */
-					union fine_value fine_estimated_es = {
-						.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
-					};
-					ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
-					if (ret != 0) {
-						log_warn("Could not add data to fine_estimated_es_buffer\n");
-					}
-					ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
-					if (ret != 0) {
-						log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
-					}
+					if (fabs(mean_phase_error) <= 10.0) {
+						/* Add fine values into fine ciruclar buffer for temperature impact */
+						/* Add fine Estimated ES values into fine circular buffer for temperature impact */
+						union fine_value fine_estimated_es = {
+							.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+						};
+						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
+						if (ret != 0) {
+							log_warn("Could not add data to fine_estimated_es_buffer\n");
+						}
+						ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
+						if (ret != 0) {
+							log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+						}
 
-					if (fabs(mean_phase_error) < 5.0) {
 						/* Add fine applied value into fine circular buffer for temperature impact */
 						union fine_value fine_applied = {
 							.fine_applied = state->fine_ctrl_value
@@ -1521,19 +1521,18 @@ int od_process(struct od *od, const struct od_input *input,
 					float dc = 0.5;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
 					if (fabs(delta_temp_composite) > 0.25) {
-						float delta_fine_temperature = get_delta_fine_from_temperature_table(
-							state->fine_estimated_es_buffer,
-							state->holdover_mRO_EP_temperature + delta_temp_composite,
-							state->holdover_mRO_EP_temperature,
-							state->estimated_equilibrium_ES
-						);
+						float fine_temperature_compensated = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
+						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f", fine_temperature_compensated);
+						float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
+
 						float effective_coefficient = delta_fine_temperature/delta_temp_composite;
 						log_debug("Temperature Compensation: delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
 								delta_temp_composite,
 								delta_fine_temperature,
 								effective_coefficient);
-						if (fabs(effective_coefficient) > 15.0) {
-							delta_fine_temperature = 15.0 * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
+#define MAX_DELTA_FINE_COEFFICIENT 20.0
+						if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
+							delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
 							log_debug("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
 						}
 						fine_applied_in_holdover += delta_fine_temperature;
