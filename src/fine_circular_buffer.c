@@ -36,6 +36,10 @@ int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fi
     if (circular_buffer->buffer_length < CIRCULAR_BUFFER_SIZE)
         circular_buffer->buffer_length++;
 
+    if (circular_buffer->buffer_length >= MIN_VALUES_FOR_MEAN) {
+        compute_mean_value(circular_buffer);
+    }
+
     return 0;
 }
 
@@ -128,10 +132,6 @@ int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATUR
     ret = write_fine(&fine_buffer[index], fine);
     if (ret != 0) {
         log_error("Could not add tuple to buffer !");
-    } else {
-        if (fine_buffer[index].buffer_length >= MIN_VALUES_FOR_MEAN) {
-            compute_mean_value(&fine_buffer[index]);
-        }
     }
 
     return ret;
