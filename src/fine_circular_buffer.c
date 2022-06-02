@@ -256,26 +256,26 @@ float get_fine_from_table(struct algorithm_state *state, float input_temperature
             return state->estimated_equilibrium_ES;
         } else if (input_temperature < state->holdover_mRO_EP_temperature) {
             /* Temperature decreased from holdover entry */
-            if (state->holdover_mRO_EP_temperature < 30.0) {
+            if (state->holdover_mRO_EP_temperature < MIN_TEMPERATURE_DEFAULT) {
                 return state->estimated_equilibrium_ES;
-            } else if (state->holdover_mRO_EP_temperature >= 40.0) {
-                if (input_temperature < 30.0) {
+            } else if (state->holdover_mRO_EP_temperature >= MAX_TEMPERATURE_DEFAULT) {
+                if (input_temperature < MIN_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES
-                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - state->holdover_mRO_EP_temperature)
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (30.0 - 40.0);
-                } else if (input_temperature >= 40.0) {
+                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - state->holdover_mRO_EP_temperature)
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - MAX_TEMPERATURE_DEFAULT);
+                } else if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES
                         + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - state->holdover_mRO_EP_temperature);
                 } else {
                     return state->estimated_equilibrium_ES
-                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - state->holdover_mRO_EP_temperature)
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - state->holdover_mRO_EP_temperature)
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
                 }
             } else {
                 /* 30 <= state->holdover_mRO_EP_temperature < 40 */
-                if (input_temperature < 30.0) {
+                if (input_temperature < MIN_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (30.0 - state->holdover_mRO_EP_temperature);
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - state->holdover_mRO_EP_temperature);
                 } else {
                     return state->estimated_equilibrium_ES
                         + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - state->holdover_mRO_EP_temperature);
@@ -283,26 +283,26 @@ float get_fine_from_table(struct algorithm_state *state, float input_temperature
             }
         } else if(input_temperature > state->holdover_mRO_EP_temperature) {
             /* Temperature increased from holdover entry */
-            if (state->holdover_mRO_EP_temperature < 30.0) {
-                if (input_temperature < 30.0) {
+            if (state->holdover_mRO_EP_temperature < MIN_TEMPERATURE_DEFAULT) {
+                if (input_temperature < MIN_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES;
-                } else if (input_temperature >= 40.0) {
+                } else if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - 30.0)
-                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - MIN_TEMPERATURE_DEFAULT)
+                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
                 } else {
                     return state->estimated_equilibrium_ES
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 30.0);
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MIN_TEMPERATURE_DEFAULT);
                 }
-            } else if (state->holdover_mRO_EP_temperature >= 40.0) {
+            } else if (state->holdover_mRO_EP_temperature >= MAX_TEMPERATURE_DEFAULT) {
                 return state->estimated_equilibrium_ES
                     + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - state->holdover_mRO_EP_temperature);
             } else {
                 /* 30 <= state->holdover_mRO_EP_temperature < 40 */
-                if (input_temperature >= 40.0) {
+                if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                     return state->estimated_equilibrium_ES
-                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - state->holdover_mRO_EP_temperature)
-                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                        + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - state->holdover_mRO_EP_temperature)
+                        + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
                 } else {
                     return state->estimated_equilibrium_ES
                         + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - state->holdover_mRO_EP_temperature);
@@ -320,53 +320,53 @@ float get_fine_from_table(struct algorithm_state *state, float input_temperature
     } else if (left_operand_index == -1) {
         /* We have a mean value on the right side of the input temperature index */
         right_operand_temperature = (right_operand_index + STEPS_BY_DEGREE * (MIN_TEMPERATURE + 0.5)) / STEPS_BY_DEGREE;
-        if (right_operand_temperature < 30.0) {
+        if (right_operand_temperature < MIN_TEMPERATURE_DEFAULT) {
             /* Flat slope */
             return fine_buffer[right_operand_index].mean_fine;
-        } if (right_operand_temperature >= 40.0) {
-            if (input_temperature < 30.0) {
+        } if (right_operand_temperature >= MAX_TEMPERATURE_DEFAULT) {
+            if (input_temperature < MIN_TEMPERATURE_DEFAULT) {
                 return fine_buffer[right_operand_index].mean_fine
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - right_operand_temperature)
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (30.0 - 40.0);
-            } else if (input_temperature >= 40.0) {
+                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - right_operand_temperature)
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - MAX_TEMPERATURE_DEFAULT);
+            } else if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                 return fine_buffer[right_operand_index].mean_fine
                     + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - right_operand_temperature);
             } else {
                 return fine_buffer[right_operand_index].mean_fine
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - right_operand_temperature)
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - right_operand_temperature)
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
             }
         } else {
-            if (input_temperature > 30.0) {
+            if (input_temperature > MIN_TEMPERATURE_DEFAULT) {
                 return fine_buffer[right_operand_index].mean_fine
                     + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - right_operand_temperature);
             } else {
                 return fine_buffer[right_operand_index].mean_fine
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (30.0 - right_operand_temperature);
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - right_operand_temperature);
             }
         }
     } else {
         /* We have a mean value on the left side of the input temperature */
         left_operand_temperature = (left_operand_index + STEPS_BY_DEGREE * (MIN_TEMPERATURE + 0.5)) / STEPS_BY_DEGREE;
-        if (left_operand_temperature < 30.0) {
-            if (input_temperature < 30.0) {
+        if (left_operand_temperature < MIN_TEMPERATURE_DEFAULT) {
+            if (input_temperature < MIN_TEMPERATURE_DEFAULT) {
                 return fine_buffer[left_operand_index].mean_fine;
-            } else if (input_temperature >= 40.0) {
+            } else if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                 return fine_buffer[left_operand_index].mean_fine
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - 30.0)
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - MIN_TEMPERATURE_DEFAULT)
+                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
             } else {
                 return fine_buffer[left_operand_index].mean_fine
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 30.0);
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MIN_TEMPERATURE_DEFAULT);
             }
-        } else if (left_operand_temperature >= 40.0) {
+        } else if (left_operand_temperature >= MAX_TEMPERATURE_DEFAULT) {
             return fine_buffer[left_operand_index].mean_fine
                 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - left_operand_temperature);
         } else {
-            if (input_temperature >= 40.0) {
+            if (input_temperature >= MAX_TEMPERATURE_DEFAULT) {
                 return fine_buffer[left_operand_index].mean_fine
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (40.0 - left_operand_temperature)
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - 40.0);
+                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - left_operand_temperature)
+                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - MAX_TEMPERATURE_DEFAULT);
             } else {
                 return fine_buffer[left_operand_index].mean_fine
                     + DEFAULT_DELTA_TEMPERATURE_COEFF * (input_temperature - left_operand_temperature);
