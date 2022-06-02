@@ -39,13 +39,13 @@
  * @brief Temperature below which we consider flat slope
  * on temperature table if we do not have values
  */
-#define MIN_TEMPERATURE_DEFAULT 30.0
+#define MIN_TEMPERATURE_DEFAULT 28.0
 /**
  * @brief Temperature above which we considere slope of 2 * DEFAULT_DELTA_TEMPERATURE_COEFF
  * when temperature table is not complete
  * or if temperature is outside of the temperature table
  */
-#define MAX_TEMPERATURE_DEFAULT 40.0
+#define MAX_TEMPERATURE_DEFAULT 38.0
 
 void print_tuples(struct fine_circular_buffer *circular_buffer);
 int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine);
