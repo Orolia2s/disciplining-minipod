@@ -1518,7 +1518,7 @@ int od_process(struct od *od, const struct od_input *input,
 					set_state(state, HOLDOVER);
 				} else {
 					/* Temperature compensation */
-					float dc = 0.5;
+					const float dc = 0.75;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
 					if (fabs(delta_temp_composite) > 0.25) {
 						float fine_temperature_compensated = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
