@@ -1526,7 +1526,8 @@ int od_process(struct od *od, const struct od_input *input,
 						float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
 
 						float effective_coefficient = delta_fine_temperature/delta_temp_composite;
-						log_debug("Temperature Compensation: delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
+						log_debug("Temperature Compensation: state->estimated_equilibrium_ES=%.2f, delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
+								state->estimated_equilibrium_ES,
 								delta_temp_composite,
 								delta_fine_temperature,
 								effective_coefficient);
