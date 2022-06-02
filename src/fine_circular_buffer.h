@@ -30,6 +30,12 @@
 #include "stdint.h"
 #include "algorithm_structs.h"
 
+/**
+ * @brief Default coefficient used when temperature table is not complete
+ * or if temperature is outside fo the temperature table
+ */
+#define DEFAULT_DELTA_TEMPERATURE_COEFF -5.0
+
 void print_tuples(struct fine_circular_buffer *circular_buffer);
 int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine);
 int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp);

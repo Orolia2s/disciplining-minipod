@@ -189,8 +189,6 @@ void update_mean_values(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEP
     }
 }
 
-#define DEFAULT_DELTA_TEMPERATURE_COEFF -3.0
-
 int find_closest_left_circular_buffer_from_index(struct fine_circular_buffer *fine_buffer, int temperature_index)
 {
     int left_operand_index = -1;

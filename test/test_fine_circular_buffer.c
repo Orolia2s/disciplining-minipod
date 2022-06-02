@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     /* Test Table with 1/3 value */
     assert(compare_float(get_fine_from_table(&state, 18.6), 2400.0));
     assert(compare_float(get_fine_from_table(&state, 21.6), 2394.0));
-    assert(compare_float(get_fine_from_table(&state, 62.25), 2229.0));
+    assert(compare_float(get_fine_from_table(&state, 62.25), 2221.0));
     /* Clear table */
     init_fine_circular_buffer(state.fine_estimated_es_buffer);
 
@@ -87,26 +87,39 @@ int main(int argc, char **argv)
     /* Test Empty table behaviour */
     assert(compare_float(get_fine_from_table(&state, 50.000001), state.estimated_equilibrium_ES));
     for (i = 0; i < 31; i++) {
-        assert(compare_float(get_fine_from_table(&state, i), 2590.0));
+        assert(compare_float(get_fine_from_table(&state, i), 2650.0));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2590.0 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2650.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2560.0 - 6 *(float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 40 + i),
+            2650.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * 10 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
 
     /* Test with Holdover temperature @ 35° */
     state.holdover_mRO_EP_temperature = 35.0;
     assert(compare_float(get_fine_from_table(&state, 35.000001), state.estimated_equilibrium_ES));
     for (i = 0; i < 31; i++) {
-        assert(compare_float(get_fine_from_table(&state, i), 2515.0));
+        assert(compare_float(get_fine_from_table(&state, i), 2525.0));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2515.0 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2525.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * i
+            ));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2485 - 6 *(float) i ));
+        assert(
+            compare_float(
+                get_fine_from_table(&state, 40 + i),
+                2525.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * 10 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+            ));
     }
 
     /* Test with Holdover temperature @ 18° */
@@ -116,10 +129,16 @@ int main(int argc, char **argv)
         assert(compare_float(get_fine_from_table(&state, i), 2500.0));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2500.0 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2500.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2470 - 6 *(float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 40 + i),
+            2500.0 + DEFAULT_DELTA_TEMPERATURE_COEFF * 10 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
 
     /* Fill table with one value before 30° */
@@ -133,10 +152,16 @@ int main(int argc, char **argv)
         assert(compare_float(get_fine_from_table(&state, i), 2445.0));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2445 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2445 + DEFAULT_DELTA_TEMPERATURE_COEFF * (float) i
+        ));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2415 - 6 *(float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 40 + i),
+            2445 + DEFAULT_DELTA_TEMPERATURE_COEFF * 10  + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (float) i
+        ));
     }
 
     /* Clear table */
@@ -150,18 +175,29 @@ int main(int argc, char **argv)
         add_fine_from_temperature(state.fine_estimated_es_buffer, fine_estimated, 35.0);
     }
     for (i = 0; i < 31; i++) {
-        assert(compare_float(get_fine_from_table(&state, i), 2461.5));
+        assert(compare_float(get_fine_from_table(&state, i), 2472.5));
     }
     for (i = 0; i < 5; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2461.5 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2472.5 + DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
+
     assert(compare_float(get_fine_from_table(&state, 35), 2445.0 ));
+
     for (i = 0; i < 5; i ++) {
-        assert(compare_float(get_fine_from_table(&state, 36 + i), 2443.5 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 36 + i),
+            2442.5 + DEFAULT_DELTA_TEMPERATURE_COEFF *i
+        ));
     }
 
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2431.5 - 6 *(float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 40 + i),
+            2442.5 + DEFAULT_DELTA_TEMPERATURE_COEFF * 4 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
 
     /* Clear table */
@@ -176,18 +212,29 @@ int main(int argc, char **argv)
     }
 
     for (i = 0; i < 31; i++) {
-        assert(compare_float(get_fine_from_table(&state, i), 2508));
+        assert(compare_float(get_fine_from_table(&state, i), 2550));
     }
     for (i = 0; i < 10; i++) {
-        assert(compare_float(get_fine_from_table(&state, 30 + i), 2508 - 3* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 30 + i),
+            2550 + DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
 
     for (i = 0; i < 5; i++) {
-        assert(compare_float(get_fine_from_table(&state, 40 + i), 2478 - 6 *(float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 40 + i),
+            2500 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
+
     assert(compare_float(get_fine_from_table(&state, 45), 2445.0 ));
+
     for (i = 0; i < 5; i ++) {
-        assert(compare_float(get_fine_from_table(&state, 46 + i), 2442.0 - 6* (float) i ));
+        assert(compare_float(
+            get_fine_from_table(&state, 46 + i),
+            2440.0 + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * i
+        ));
     }
 
     ret = write_buffers_in_file(state.fine_estimated_es_buffer, "./output_buffer.txt");
