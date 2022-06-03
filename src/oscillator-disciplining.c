@@ -393,7 +393,7 @@ static int init_algorithm_state(struct od * od) {
 
 	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
 	/* Constant state values */
-	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;	
+	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
 
 	state->ctrl_range_coarse[0] = COARSE_RANGE_MIN;
@@ -1455,20 +1455,24 @@ int od_process(struct od *od, const struct od_input *input,
 					if (fabs(delta_temp_composite) > 0.25) {
 						float fine_temperature_compensated = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
 						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f", fine_temperature_compensated);
-						float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
+						if (fine_temperature_compensated >= FINE_RANGE_MIN && fine_temperature_compensated <= FINE_RANGE_MAX) {
+							float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
 
-						float effective_coefficient = delta_fine_temperature/delta_temp_composite;
-						log_debug("Temperature Compensation: state->estimated_equilibrium_ES=%.2f, delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
-								state->estimated_equilibrium_ES,
-								delta_temp_composite,
-								delta_fine_temperature,
-								effective_coefficient);
-#define MAX_DELTA_FINE_COEFFICIENT 20.0
-						if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
-							delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
-							log_debug("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
+							float effective_coefficient = delta_fine_temperature/delta_temp_composite;
+							log_debug("Temperature Compensation: state->estimated_equilibrium_ES=%.2f, delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
+									state->estimated_equilibrium_ES,
+									delta_temp_composite,
+									delta_fine_temperature,
+									effective_coefficient);
+#define MAX_DELTA_FINE_COEFFICIENT 25.0
+							if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
+								delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
+								log_warn("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
+							}
+							fine_applied_in_holdover += delta_fine_temperature;
+						} else {
+							log_error("Inconsistent fine temperature compensated computed: %.2f", fine_temperature_compensated);
 						}
-						fine_applied_in_holdover += delta_fine_temperature;
 					}
 
 					log_debug("fine_applied_in_holdover is %.2f", fine_applied_in_holdover);
