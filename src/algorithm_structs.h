@@ -111,18 +111,12 @@
 
 #define MIN_VALUES_FOR_MEAN 10
 
-union fine_value {
-    float fine_estimated_equilibrium_ES;
-    uint16_t fine_applied;
-};
-
 struct fine_circular_buffer {
-    union fine_value buffer[CIRCULAR_BUFFER_SIZE];
-    char fine_type; // 'A' for fine applied, 'S' for smoothed
+    float buffer[CIRCULAR_BUFFER_SIZE];
     float mean_fine;
-    int read_index;
-    int write_index;
-    int buffer_length;
+    uint8_t read_index;
+    uint8_t write_index;
+    uint8_t buffer_length;
 };
 
 /**
@@ -188,9 +182,6 @@ struct algorithm_state {
 	float mRO_EP_temperature;
 	/** MRO50's smoothed temperature when entering holdover */
 	float holdover_mRO_EP_temperature;
-	/* Buffer to store fine applied in temperature ranges */
-	struct fine_circular_buffer fine_applied_buffer[TEMPERATURE_STEPS];
-	char fine_applied_buffer_output_path[256];
 	/* Buffer to store fine estimated ES in temperature ranges */
 	struct fine_circular_buffer fine_estimated_es_buffer[TEMPERATURE_STEPS];
 	char fine_estimated_buffer_buffer_output_path[256];

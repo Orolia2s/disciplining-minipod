@@ -48,17 +48,11 @@
 #define MAX_TEMPERATURE_DEFAULT 38.0
 
 void print_tuples(struct fine_circular_buffer *circular_buffer);
-int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine);
-int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp);
+int write_fine(struct fine_circular_buffer *circular_buffer, float fine);
+int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], float fine, double temp);
 int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], const char* output_file);
 int compute_mean_value(struct fine_circular_buffer *fine_buffer);
 int get_index_of_temperature(float temperature);
-float get_delta_fine_from_temperature_table(
-    struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS],
-    float input_temperature,
-    float holdover_mRO_EP_temperature,
-    float estimated_equilibrium_ES
-);
 int find_closest_left_circular_buffer_from_index(struct fine_circular_buffer *fine_buffer, int temperature_index);
 int find_closest_right_circular_buffer_from_index(struct fine_circular_buffer *fine_buffer, int temperature_index);
 float get_fine_from_table(struct algorithm_state *state, float input_temperature);

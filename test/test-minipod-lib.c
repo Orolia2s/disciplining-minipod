@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "compare_floats.h"
+#include "../src/compare_floats.h"
 
 struct minipod_config minipod_config = {
     .ref_fluctuations_ns = 30,
@@ -56,7 +56,7 @@ struct disciplining_parameters disciplining_parameters = {
  * TEST MINIPOD LIBRARY
  * Test the interface of the oscillator disciplining library
  */
-int main()
+int main(int argc, char *argv[])
 {
     char err_msg[OD_ERR_MSG_LEN];
     struct od *od;

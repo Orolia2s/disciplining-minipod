@@ -23,5 +23,20 @@ jobs:
     - name: Install
       run: sudo make -C ${{github.workspace}}/build install
 
-    - name: Run tests
-      run: make -C ${{github.workspace}}/test
+    - name: Configure CMake for tests
+      run: cmake -DBUILD_TESTS=true -B ${{github.workspace}}/build
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build
+
+    - name: Test checks
+      run: ${{github.workspace}}/build/test/test-checks
+
+    - name: Test utils
+      run: ${{github.workspace}}/build/test/test-utils
+
+    - name: Test minipod-lib
+      run: ${{github.workspace}}/build/test/test-minipod-lib
+
+    - name: Test fine-circular-buffer
+      run: ${{github.workspace}}/build/test/test-fine-circular-buffer

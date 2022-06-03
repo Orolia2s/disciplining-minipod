@@ -1,12 +1,12 @@
 #include <assert.h>
 #include "stdio.h"
 
-#include "compare_floats.h"
+#include "../src/compare_floats.h"
 #include "../src/log.h"
 #include "../src/fine_circular_buffer.h"
 #include "../src/algorithm_structs.h"
 
-static void test_get_index_of_temperature()
+static void test_get_index_of_temperature(void)
 {
     assert(get_index_of_temperature(45.6) == 102);
     assert(get_index_of_temperature(38.32) == 73);
@@ -15,17 +15,16 @@ static void test_get_index_of_temperature()
     assert(get_index_of_temperature(60) == TEMPERATURE_STEPS);
 }
 
-static void init_fine_circular_buffer(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS])
+static void init_fine_circular_buffer(struct fine_circular_buffer *fine_buffer)
 {
     int i;
     for ( i = 0; i < TEMPERATURE_STEPS; i ++) {
         fine_buffer[i].buffer_length = 0;
         fine_buffer[i].read_index = 0;
         fine_buffer[i].write_index = 0;
-        fine_buffer[i].fine_type = 'S';
         int j;
         for (j = 0; j < CIRCULAR_BUFFER_SIZE; j++) {
-            fine_buffer[i].buffer[j].fine_estimated_equilibrium_ES = 0.0;
+            fine_buffer[i].buffer[j] = 0.0;
         }
     }
 }
@@ -48,17 +47,13 @@ int main(int argc, char **argv)
         if (i % 3 == 0) {
             double temperature = (float) ((float) i + MIN_TEMPERATURE * STEPS_BY_DEGREE) / STEPS_BY_DEGREE;
             for (j = 0; j < MIN_VALUES_FOR_MEAN; j++) {
-                union fine_value fine_estimated = {
-                    .fine_estimated_equilibrium_ES = 2400.0 - i
-                };
-                ret = add_fine_from_temperature(state.fine_estimated_es_buffer, fine_estimated, temperature);
+                ret = add_fine_from_temperature(state.fine_estimated_es_buffer, 2400.0 - i, temperature);
                 if (ret != 0) {
                     printf("Could not add data to buffer\n");
                     return -1;
                 }
             }
             /* Mean value should be computed automatically so check value is set as expected */
-            log_debug("state.fine_estimated_es_buffer[T=%.2f].mean_fine = %.2f", temperature, state.fine_estimated_es_buffer[i].mean_fine);
             assert(compare_float(state.fine_estimated_es_buffer[i].mean_fine, 2400.0 - i) == 1);
         }
     }
@@ -144,10 +139,7 @@ int main(int argc, char **argv)
 
     /* Fill table with one value before 30° */
     for (i = 0; i < MIN_VALUES_FOR_MEAN; i++) {
-        union fine_value fine_estimated = {
-            .fine_estimated_equilibrium_ES = 2400.0 + 10 * i
-        };
-        add_fine_from_temperature(state.fine_estimated_es_buffer, fine_estimated, 25.0);
+        add_fine_from_temperature(state.fine_estimated_es_buffer, 2400.0 + 10 * i, 25.0);
     }
     for (i = 0; i < 28; i++) {
         assert(compare_float(get_fine_from_table(&state, i), 2445.0));
@@ -170,10 +162,7 @@ int main(int argc, char **argv)
 
     /* Fill table with one value between 30 and 40° */
     for (i = 0; i < MIN_VALUES_FOR_MEAN; i++) {
-        union fine_value fine_estimated = {
-            .fine_estimated_equilibrium_ES = 2400.0 + 10 * i
-        };
-        add_fine_from_temperature(state.fine_estimated_es_buffer, fine_estimated, 35.0);
+        add_fine_from_temperature(state.fine_estimated_es_buffer, 2400.0 + 10 * i, 35.0);
     }
     for (i = 0; i < 28; i++) {
         assert(compare_float(get_fine_from_table(&state, i), 2482.5));
@@ -206,10 +195,7 @@ int main(int argc, char **argv)
 
      /* Fill table with one value above 40° */
     for (i = 0; i < MIN_VALUES_FOR_MEAN; i++) {
-        union fine_value fine_estimated = {
-            .fine_estimated_equilibrium_ES = 2400.0 + 10 * i
-        };
-        add_fine_from_temperature(state.fine_estimated_es_buffer, fine_estimated, 45.0);
+        add_fine_from_temperature(state.fine_estimated_es_buffer, 2400.0 + 10 * i, 45.0);
     }
 
     for (i = 0; i < 28; i++) {

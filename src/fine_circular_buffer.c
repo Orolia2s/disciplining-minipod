@@ -1,33 +1,19 @@
 #include "fine_circular_buffer.h"
+#include "compare_floats.h"
 #include "log.h"
 
 #include <errno.h>
 #include <math.h>
 #include <string.h>
 
-#define TOLERANCE_PRECISION 0.00001
-static inline int compare_float(float f1, float f2)
-{
-    return fabs(f1 -f2) <= TOLERANCE_PRECISION ? 1 : 0;
-}
-
-int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fine)
+int write_fine(struct fine_circular_buffer *circular_buffer, float fine)
 {
     if (!circular_buffer) {
         log_error("Circular buffer is NULL");
         return - EINVAL;
     }
 
-    if (circular_buffer->fine_type == 'A') {
-        /* Write tuple at write index */
-        circular_buffer->buffer[circular_buffer->write_index].fine_applied = fine.fine_applied;
-    } else if (circular_buffer->fine_type == 'S') {
-        circular_buffer->buffer[circular_buffer->write_index].fine_estimated_equilibrium_ES = fine.fine_estimated_equilibrium_ES;
-    } else {
-        log_error("Buffer is not of type 'A' or 'S'");
-        return -EINVAL;
-    }
-
+    circular_buffer->buffer[circular_buffer->write_index] = fine;
     /* Increment write index */
     circular_buffer->write_index++;
     if (circular_buffer->write_index == CIRCULAR_BUFFER_SIZE)
@@ -43,7 +29,7 @@ int write_fine(struct fine_circular_buffer *circular_buffer, union fine_value fi
     return 0;
 }
 
-static int read_buffer(struct fine_circular_buffer *circular_buffer, union fine_value *returned_value)
+static int read_buffer(struct fine_circular_buffer *circular_buffer, float *returned_value)
 {
     if (!circular_buffer) {
         log_error("Circular buffer is NULL");
@@ -55,14 +41,7 @@ static int read_buffer(struct fine_circular_buffer *circular_buffer, union fine_
         return -1;
     }
 
-    if (circular_buffer->fine_type == 'A') {
-        returned_value->fine_applied = circular_buffer->buffer[circular_buffer->read_index].fine_applied;
-    } else if (circular_buffer->fine_type == 'S') {
-        returned_value->fine_estimated_equilibrium_ES = circular_buffer->buffer[circular_buffer->read_index].fine_estimated_equilibrium_ES;
-    } else {
-        log_error("Buffer is not of type 'A' or 'S'");
-        return -EINVAL;
-    }
+    *returned_value = circular_buffer->buffer[circular_buffer->read_index];
 
     /* Increment read index */
     circular_buffer->read_index++;
@@ -78,29 +57,14 @@ void print_tuples(struct fine_circular_buffer *circular_buffer)
     if (!circular_buffer)
         return;
 
-    if (circular_buffer->fine_type == 'A') {
-        for (i = 0; i < circular_buffer->buffer_length; i++) {
-            index = circular_buffer->read_index + i;
-            if (index >= CIRCULAR_BUFFER_SIZE) {
-                index -= CIRCULAR_BUFFER_SIZE;
-            }
-            log_debug("buffer[%u] = %u",
-                i,
-                circular_buffer->buffer[index].fine_applied);
+    for (i = 0; i < circular_buffer->buffer_length; i++) {
+        index = circular_buffer->read_index + i;
+        if (index >= CIRCULAR_BUFFER_SIZE) {
+            index -= CIRCULAR_BUFFER_SIZE;
         }
-    } else if (circular_buffer->fine_type == 'S') {
-        for (i = 0; i < circular_buffer->buffer_length; i++) {
-            index = circular_buffer->read_index + i;
-            if (index >= CIRCULAR_BUFFER_SIZE) {
-                index -= CIRCULAR_BUFFER_SIZE;
-            }
-            log_debug("buffer[%u] = %f",
-                i,
-                circular_buffer->buffer[index].fine_estimated_equilibrium_ES);
-        }
-    } else {
-        log_error("Buffer is not of type 'A' or 'S'");
-        return;
+        log_debug("buffer[%u] = %f",
+            i,
+            circular_buffer->buffer[index]);
     }
 }
 
@@ -114,7 +78,7 @@ int get_index_of_temperature(float temperature) {
     }
 }
 
-int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], union fine_value fine, double temp)
+int add_fine_from_temperature(struct fine_circular_buffer fine_buffer[TEMPERATURE_STEPS], float fine, double temp)
 {
     int index;
     int ret;
@@ -157,24 +121,12 @@ int compute_mean_value(struct fine_circular_buffer *fine_buffer)
 
     fine_buffer->mean_fine = 0.0;
 
-    union fine_value fine;
-
-    if (fine_buffer->fine_type == 'A') {
-        while (read_buffer(fine_buffer, &fine) == 0) {
-            fine_buffer->mean_fine += fine.fine_applied;
-        }
-
-    } else if (fine_buffer->fine_type == 'S') {
-        while (read_buffer(fine_buffer, &fine) == 0) {
-            fine_buffer->mean_fine += fine.fine_estimated_equilibrium_ES;
-        }
-
-    } else {
-        log_error("Buffer is not of type 'A' or 'S'");
-        return -EINVAL;
+    float fine;
+    while (read_buffer(fine_buffer, &fine) == 0) {
+        fine_buffer->mean_fine += fine;
     }
-    fine_buffer->mean_fine = fine_buffer->mean_fine / fine_buffer->buffer_length;
 
+    fine_buffer->mean_fine = fine_buffer->mean_fine / fine_buffer->buffer_length;
     fine_buffer->read_index = 0;
     return 0;
 }
@@ -361,20 +313,13 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
     for (i = 0; i < TEMPERATURE_STEPS; i++) {
         char fine_char[2048] = { '\0' };
 
-        union fine_value fine;
+        float fine;
 
         while(read_buffer(&fine_buffer[i], &fine) == 0) {
             char temp[32] = { 0 };
 
-            if (fine_buffer->fine_type == 'A') {
-                sprintf(temp, ",%u", fine.fine_applied);
-            } else if (fine_buffer->fine_type == 'S') {
-                sprintf(temp, ",%.2f", fine.fine_estimated_equilibrium_ES);
+            sprintf(temp, ",%.2f", fine);
 
-            } else {
-                log_error("Buffer is not of type 'A' or 'S'");
-                return -EINVAL;
-            }
             strcat(fine_char, temp);
         }
 
@@ -389,22 +334,11 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         fputs(line, fp);
 
         if (compute_mean_value(&fine_buffer[i]) == 0) {
-            if (fine_buffer->fine_type == 'A') {
-                log_debug("FINE APPLIED: Mean temperature over range [%.2f, %.2f[ is : %.2f",
-                    (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
-                    (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
-                    fine_buffer[i].mean_fine
-                );
-            } else if (fine_buffer->fine_type == 'S') {
-                log_debug("FINE ESTIMATED ES: Mean temperature over range [%.2f, %.2f[ is : %.2f",
-                    (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
-                    (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
-                    fine_buffer[i].mean_fine
-                );
-            } else {
-                log_error("Buffer is not of type 'A' or 'S'");
-                return -EINVAL;
-            }
+            log_debug("FINE ESTIMATED ES: Mean temperature over range [%.2f, %.2f[ is : %.2f",
+                (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
+                (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
+                fine_buffer[i].mean_fine
+            );
         }
     }
 
