@@ -1684,7 +1684,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	monitoring->status = od->state.status;
 	monitoring->ready_for_holdover = od->state.ready_to_go_in_holdover_class;
 	if ((od->state.tracking_only_forced) &&
-		(od->state.current_phase_convergence_count >  round(6.0 / ALPHA_ES_TRACKING))) {
+		(od->state.current_phase_convergence_count >  round(1.0 / ALPHA_ES_TRACKING))) {
 		monitoring->clock_class = CLOCK_CLASS_LOCK;
 	}
 
