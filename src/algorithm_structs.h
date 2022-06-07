@@ -46,48 +46,9 @@
 /** Maximum possible value of fine control used for calibration*/
 #define FINE_MID_RANGE_MAX 3200
 /**
- * @brief R2 maximum acceptable value in LOCK low resolution phase
- * when computing frequency error and std deviation
- */
-#define R2_THRESHOLD_LOW_RESOLUTION 0.4
-/**
- * @brief R2 maximum acceptable value in LOCK high resolution phase
- * when computing frequency error and std deviation
- */
-#define R2_THRESHOLD_HIGH_RESOLUTION 0.45
-
-/**
- * @brief Maximum acceptable frequency error in ns per s in Low resolution
- */
-#define LOCK_LOW_RES_FREQUENCY_ERROR_MAX 0.5
-/**
- * @brief Minimum frequency error in low res to go into Lock High resolution mode
- */
-#define LOCK_LOW_RES_FREQUENCY_ERROR_MIN 0.05
-/**
- * @brief Maximum acceptable frequency error in ns per s in High resolution
- */
-#define LOCK_HIGH_RES_FREQUENCY_ERROR_MAX 0.075
-/**
- * @brief Minimum frequency error in ns per s for fit resolution
- */
-#define LOCK_HIGH_RES_FREQUENCY_ERROR_MIN 0.0075
-/**
- * @brief Maximum acceptable  relative fine adjustment delta authorized with respect to equilibrium in tracking-only final stage
+ * @brief Maximum acceptable  relative fine adjustment delta authorized with respect to equilibrium in tracking final stage
  */
 #define TRACKING_ONLY_FINE_DELTA_MAX 200
-/**
- * @brief Maximum acceptable fine adjustment delta authorized in lock low resolution
- * /!\ This value should be close to round(LOCK_LOW_RES_FREQUENCY_ERROR_MAX / (4 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
- * Must be lower to LOCK_LOW_RES_FREQUENCY_ERROR_MAX / fabs(MRO_FINE_STEP_SENSITIVITY * 1.E9)
- */
-#define LOCK_LOW_RES_FINE_DELTA_MAX 40
-/**
- * @brief Maximum acceptable fine adjustment delta authorized in lock Hiugh resolution
- * /!\ This value should be close to round(LOCK_HIGH_RES_FREQUENCY_ERROR_MAX / (4 * fabs((MRO_FINE_STEP_SENSITIVITY * 1.E9))))
- * Must be lower to LOCK_HIGH_RES_FREQUENCY_ERROR_MAX / fabs(MRO_FINE_STEP_SENSITIVITY * 1.E9)
- */
-#define LOCK_HIGH_RES_FINE_DELTA_MAX 5
 /**
  * Maximum drift coefficient
  * (Fine mid value * abs(mRO base fine step sensitivity) in s/s)
@@ -185,8 +146,6 @@ struct algorithm_state {
 	/* Buffer to store fine estimated ES in temperature ranges */
 	struct fine_circular_buffer fine_estimated_es_buffer[TEMPERATURE_STEPS];
 	char fine_estimated_buffer_buffer_output_path[256];
-	/* Indicate tracking only is forced, wether by config or if SurveyIn does not complete */
-	bool tracking_only_forced;
 	/* Indicate wether going in Holdover state should display Holdover Clock Class or Uncalibrated */
 	bool ready_to_go_in_holdover_class;
 };
