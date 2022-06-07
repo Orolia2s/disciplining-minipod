@@ -1464,7 +1464,7 @@ int od_process(struct od *od, const struct od_input *input,
 									delta_temp_composite,
 									delta_fine_temperature,
 									effective_coefficient);
-#define MAX_DELTA_FINE_COEFFICIENT 25.0
+#define MAX_DELTA_FINE_COEFFICIENT 75.0
 							if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
 								delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
 								log_warn("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
