@@ -111,6 +111,18 @@ struct minipod_config {
 #define MEAN_TEMPERATURE_ARRAY_MAX 160
 
 /**
+ * @brief Number of steps by degrees (1/ 0.25° range)
+ */
+#define STEPS_BY_DEGREE 4
+
+#define MIN_TEMPERATURE 20.0
+#define MAX_TEMPERATURE 60.0
+
+#define CIRCULAR_BUFFER_SIZE 25
+
+#define MIN_VALUES_FOR_MEAN 10
+
+/**
  * @struct disciplining parameters
  * @brief Disciplining parameters corresponding to mRO50 device disciplined
  *

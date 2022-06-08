@@ -99,17 +99,7 @@
  * Each step is a 0.25° range
  */
 #define TEMPERATURE_STEPS 160
-/**
- * @brief Number of steps by degrees (1/ 0.25° range)
- */
-#define STEPS_BY_DEGREE 4
 
-#define MIN_TEMPERATURE 20.0
-#define MAX_TEMPERATURE 60.0
-
-#define CIRCULAR_BUFFER_SIZE 25
-
-#define MIN_VALUES_FOR_MEAN 10
 
 struct fine_circular_buffer {
     float buffer[CIRCULAR_BUFFER_SIZE];

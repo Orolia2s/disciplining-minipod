@@ -362,7 +362,7 @@ static void init_temperature_table(struct algorithm_state *state, struct minipod
 	for (i = 0; i < MEAN_TEMPERATURE_ARRAY_MAX; i++) {
 		float fine = (float) disciplining_parameters->mean_fine_over_temperature[i] / 10.0;
 		if (fine >= FINE_MID_RANGE_MIN && fine <= FINE_MID_RANGE_MAX) {
-			log_debug("Writing mean value of %.2f in temperature range [%.2f, %.2f[",
+			log_debug("Temperature table: Adding mean value of %.2f in temperature range [%.2f, %.2f[",
 				fine,
 				(i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
 				(i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE);
