@@ -17,15 +17,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include "../src/utils.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "../src/utils.h"
-#include "../src/compare_floats.h"
+#include "compare_floats.h"
 
-int main(int argc, char *argv[]) {
+int main() {
     int ret;
 
     printf("TEST utils program\n");
