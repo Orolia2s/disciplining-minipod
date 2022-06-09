@@ -333,7 +333,7 @@ int write_buffers_in_file(struct fine_circular_buffer fine_buffer[TEMPERATURE_ST
         strcat(line, "\n");
         fputs(line, fp);
 
-        if (compute_mean_value(&fine_buffer[i]) == 0) {
+        if (fine_buffer[i].buffer_length >= MIN_VALUES_FOR_MEAN && compute_mean_value(&fine_buffer[i]) == 0) {
             log_debug("FINE ESTIMATED ES: Mean temperature over range [%.2f, %.2f[ is : %.2f",
                 (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
                 (i + 1 + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
