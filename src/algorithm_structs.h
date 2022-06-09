@@ -109,7 +109,7 @@
 
 #define CIRCULAR_BUFFER_SIZE 25
 
-#define MIN_VALUES_FOR_MEAN 10
+#define MIN_VALUES_FOR_MEAN CIRCULAR_BUFFER_SIZE
 
 union fine_value {
     float fine_estimated_equilibrium_ES;
