@@ -100,7 +100,7 @@ struct minipod_config {
 	/** Set the track only mode */
 	bool tracking_only;
 	/** file path to store temperature fine table */
-	char *fine_table_output_path;
+	const char *fine_table_output_path;
 };
 
 /**
