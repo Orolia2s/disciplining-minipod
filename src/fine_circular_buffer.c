@@ -166,7 +166,7 @@ int find_closest_right_circular_buffer_from_index(struct fine_circular_buffer *f
     int right_operand_index = -1;
     int i;
     /* Find closest right circular buffer with enough value to compute mean fine */
-    for(i = temperature_index + 1; i <= TEMPERATURE_STEPS; i++) {
+    for(i = temperature_index + 1; i < TEMPERATURE_STEPS; i++) {
         if (fine_buffer[i].buffer_length >= MIN_VALUES_FOR_MEAN) {
             log_debug("temperature range [%.2f, %.2f[ (index %d) can be used as right operand for fine computing",
                     (i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
