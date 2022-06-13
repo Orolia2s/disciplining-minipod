@@ -165,7 +165,7 @@ struct disciplining_parameters {
 	bool calibration_valid;
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
-	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
+	int16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
 };
 
 /**

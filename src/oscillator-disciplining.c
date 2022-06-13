@@ -379,7 +379,7 @@ static void init_temperature_table(struct algorithm_state *state, struct minipod
 		union fine_value fine = {
 			.fine_estimated_equilibrium_ES = (float) disciplining_parameters->mean_fine_over_temperature[i] / 10.0
 		};
-		if (fine.fine_estimated_equilibrium_ES >= FINE_MID_RANGE_MIN
+		if (fine.fine_estimated_equilibrium_ES >= -FINE_MID_RANGE_MAX
 			&& fine.fine_estimated_equilibrium_ES <= FINE_MID_RANGE_MAX) {
 			log_debug("Writing mean value of %.2f in temperature range [%.2f, %.2f[",
 				fine.fine_estimated_equilibrium_ES,
@@ -998,37 +998,37 @@ int od_process(struct od *od, const struct od_input *input,
 						state->estimated_drift = react_coeff;
 						set_output(output, ADJUST_FINE, state->fine_ctrl_value, 0);
 
-						/* Do not add temperature value at the beginning of tracking */
-						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
-							&& fabs(mean_phase_error) <= 10.0) {
-							/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
-							log_debug("Add fine estimated ES");
-							union fine_value fine_estimated_es = {
-								.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
-							};
-							ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
-							if (ret != 0) {
-								log_warn("Could not add data to fine_estimated_es_buffer\n");
-							}
-							ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
-							if (ret != 0) {
-								log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
-							}
+						// /* Do not add temperature value at the beginning of tracking */
+						// if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
+						// 	&& fabs(mean_phase_error) <= 10.0) {
+						// 	/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
+						// 	log_debug("Add fine estimated ES");
+						// 	union fine_value fine_estimated_es = {
+						// 		.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+						// 	};
+						// 	ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
+						// 	if (ret != 0) {
+						// 		log_warn("Could not add data to fine_estimated_es_buffer\n");
+						// 	}
+						// 	ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
+						// 	if (ret != 0) {
+						// 		log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+						// 	}
 
-							log_debug("Add fine applied ES");
-							/* Add fine applied value into fine circular buffer for temperature impact */
-							union fine_value fine_applied = {
-								.fine_applied = state->fine_ctrl_value
-							};
-							ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
-							if (ret != 0) {
-								log_warn("Could not add data to fine_applied_buffer\n");
-							}
-							ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
-							if (ret != 0) {
-								log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
-							}
-						}
+						// 	log_debug("Add fine applied ES");
+						// 	/* Add fine applied value into fine circular buffer for temperature impact */
+						// 	union fine_value fine_applied = {
+						// 		.fine_applied = state->fine_ctrl_value
+						// 	};
+						// 	ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+						// 	if (ret != 0) {
+						// 		log_warn("Could not add data to fine_applied_buffer\n");
+						// 	}
+						// 	ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+						// 	if (ret != 0) {
+						// 		log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+						// 	}
+						// }
 					}
 					else
 					{
@@ -1237,34 +1237,34 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
-					if (fabs(mean_phase_error) <= 10.0) {
-						/* Add fine values into fine ciruclar buffer for temperature impact */
-						/* Add fine Estimated ES values into fine circular buffer for temperature impact */
-						union fine_value fine_estimated_es = {
-							.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
-						};
-						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
-						if (ret != 0) {
-							log_warn("Could not add data to fine_estimated_es_buffer\n");
-						}
-						ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
-						if (ret != 0) {
-							log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
-						}
+					// if (fabs(mean_phase_error) <= 10.0) {
+					// 	/* Add fine values into fine ciruclar buffer for temperature impact */
+					// 	/* Add fine Estimated ES values into fine circular buffer for temperature impact */
+					// 	union fine_value fine_estimated_es = {
+					// 		.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+					// 	};
+					// 	ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
+					// 	if (ret != 0) {
+					// 		log_warn("Could not add data to fine_estimated_es_buffer\n");
+					// 	}
+					// 	ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
+					// 	if (ret != 0) {
+					// 		log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+					// 	}
 
-						/* Add fine applied value into fine circular buffer for temperature impact */
-						union fine_value fine_applied = {
-							.fine_applied = state->fine_ctrl_value
-						};
-						ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
-						if (ret != 0) {
-							log_warn("Could not add data to fine_applied_buffer\n");
-						}
-						ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
-						if (ret != 0) {
-							log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
-						}
-					}
+					// 	/* Add fine applied value into fine circular buffer for temperature impact */
+					// 	union fine_value fine_applied = {
+					// 		.fine_applied = state->fine_ctrl_value
+					// 	};
+					// 	ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+					// 	if (ret != 0) {
+					// 		log_warn("Could not add data to fine_applied_buffer\n");
+					// 	}
+					// 	ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+					// 	if (ret != 0) {
+					// 		log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+					// 	}
+					// }
 
 
 					/* Check wether high resolution has been reached */
@@ -1451,33 +1451,33 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Update estimated equilibrium ES in discplining parameters */
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
-					if (fabs(mean_phase_error) < 10.0) {
-						/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
-						union fine_value fine_estimated_es = {
-							.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
-						};
-						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
-						if (ret != 0) {
-							log_warn("Could not add data to fine_estimated_es_buffer\n");
-						}
-						ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
-						if (ret != 0) {
-							log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
-						}
+					// if (fabs(mean_phase_error) < 10.0) {
+					// 	/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
+					// 	union fine_value fine_estimated_es = {
+					// 		.fine_estimated_equilibrium_ES = state->estimated_equilibrium_ES
+					// 	};
+					// 	ret = add_fine_from_temperature(state->fine_estimated_es_buffer, fine_estimated_es, state->mRO_EP_temperature);
+					// 	if (ret != 0) {
+					// 		log_warn("Could not add data to fine_estimated_es_buffer\n");
+					// 	}
+					// 	ret = write_buffers_in_file(state->fine_estimated_es_buffer, state->fine_estimated_buffer_buffer_output_path);
+					// 	if (ret != 0) {
+					// 		log_error("Error writing temperature table in %s", state->fine_estimated_buffer_buffer_output_path);
+					// 	}
 
-						/* Add fine applied value into fine circular buffer for temperature impact */
-						union fine_value fine_applied = {
-							.fine_applied = state->fine_ctrl_value
-						};
-						ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
-						if (ret != 0) {
-							log_warn("Could not add data to fine_applied_buffer\n");
-						}
-						ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
-						if (ret != 0) {
-							log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
-						}
-					}
+					// 	/* Add fine applied value into fine circular buffer for temperature impact */
+					// 	union fine_value fine_applied = {
+					// 		.fine_applied = state->fine_ctrl_value
+					// 	};
+					// 	ret = add_fine_from_temperature(state->fine_applied_buffer, fine_applied, input->temperature);
+					// 	if (ret != 0) {
+					// 		log_warn("Could not add data to fine_applied_buffer\n");
+					// 	}
+					// 	ret = write_buffers_in_file(state->fine_applied_buffer, state->fine_applied_buffer_output_path);
+					// 	if (ret != 0) {
+					// 		log_error("Error writing temperature table in %s", state->fine_applied_buffer_output_path);
+					// 	}
+					// }
 
 				} else {
 					log_warn("Low linear fit quality, applying estimated equilibrium");
@@ -1513,8 +1513,17 @@ int od_process(struct od *od, const struct od_input *input,
 					const float dc = 0.75;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
 					if (fabs(delta_temp_composite) > 0.1) {
-						float fine_temperature_compensated = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
-						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f", fine_temperature_compensated);
+						float delta_fine_composite = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
+						float delta_fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature);
+						
+						float fine_temperature_compensated = state->estimated_equilibrium_ES + (delta_fine_composite - delta_fine_holdover);
+
+						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f,  state->estimated_equilibrium_ES=%.2f, delta_fine_composite=%.2f,delta_fine_holdover=%.2f",
+							fine_temperature_compensated,
+							state->estimated_equilibrium_ES,
+							delta_fine_composite,
+							delta_fine_holdover
+						);
 						if (fine_temperature_compensated >= FINE_RANGE_MIN && fine_temperature_compensated <= FINE_RANGE_MAX) {
 							float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
 
@@ -1572,7 +1581,7 @@ int od_get_disciplining_parameters(struct od *od, struct disciplining_parameters
 	}
 	/* Update temperature table values stored in disciplining parameters */
 	memcpy(disciplining_parameters, &od->dsc_parameters, sizeof(struct disciplining_parameters));
-	update_temperature_mean_values(disciplining_parameters, &od->state);
+	//update_temperature_mean_values(disciplining_parameters, &od->state);
 	return 0;
 }
 
