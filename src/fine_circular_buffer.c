@@ -266,6 +266,10 @@ float get_fine_from_table(struct algorithm_state *state, float input_temperature
     left_operand_index = find_closest_left_circular_buffer_from_index(fine_buffer, input_temperature_index);
 
     if (right_operand_index == -1 && left_operand_index == -1) {
+        log_error("Temperature Compensation: Using default behaviour with state->estimated_equilibrium_ES (%.2f) at state->holdover_mRO_EP_temperature (%.2f) as only point in temperature table",
+            state->estimated_equilibrium_ES,
+            state->holdover_mRO_EP_temperature
+        );
         /* We have no value in table */
         return get_fine_from_default_temperature_compensation(
             input_temperature,
