@@ -120,7 +120,7 @@ struct minipod_config {
 
 #define CIRCULAR_BUFFER_SIZE 25
 
-#define MIN_VALUES_FOR_MEAN 10
+#define MIN_VALUES_FOR_MEAN CIRCULAR_BUFFER_SIZE
 
 /**
  * @struct disciplining parameters
