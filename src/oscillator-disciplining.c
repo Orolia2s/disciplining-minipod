@@ -413,8 +413,8 @@ static int init_algorithm_state(struct od * od) {
 	state->current_phase_convergence_count = 0;
 	state->previous_freq_error = 0.0;
 
-	state->mRO_EP_temperature = -100000.0;
-	state->holdover_mRO_EP_temperature = -100000.0;
+	state->mRO_EP_temperature = -99.99;
+	state->holdover_mRO_EP_temperature = -99.99;
 
 	state->ready_to_go_in_holdover_class = false;
 
