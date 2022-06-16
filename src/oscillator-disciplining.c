@@ -908,6 +908,11 @@ int od_process(struct od *od, const struct od_input *input,
 					}
 					else{
 						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
+						if (abs(delta_fine) > TRACKING_ONLY_FINE_DELTA_MAX) {
+							delta_fine = delta_fine < 0 ?
+								-TRACKING_ONLY_FINE_DELTA_MAX :
+								TRACKING_ONLY_FINE_DELTA_MAX;
+						}
 						state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + delta_fine);
 					}
 					
