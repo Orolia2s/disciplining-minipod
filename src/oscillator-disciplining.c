@@ -297,10 +297,11 @@ static float get_smooth_coefficient(struct algorithm_state *state)
 			&& (state->current_phase_convergence_count <= round(24 / ALPHA_ES_TRACKING))) {
 			log_debug("slow smoothing convergence : 0.5* %f applied", ALPHA_ES_TRACKING);
 			coefficient = 0.5;
-		} else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
-			log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
-			coefficient = 0.25;
-		}
+		} 
+		// else if (state->current_phase_convergence_count > round(24 / ALPHA_ES_TRACKING)){
+		// 	log_debug("final slow smoothing convergence : 0.25* %f applied", ALPHA_ES_TRACKING);
+		// 	coefficient = 0.25;
+		// }
 
 		return coefficient * ALPHA_ES_TRACKING;
 	case LOCK_LOW_RESOLUTION:
