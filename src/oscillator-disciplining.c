@@ -901,11 +901,8 @@ int od_process(struct od *od, const struct od_input *input,
 
 
 					if (state->current_phase_convergence_count <= round(12 / ALPHA_ES_TRACKING)){
-						ret = compute_fine_value(state, react_coeff, &state->fine_ctrl_value);
-						if (ret != 0) {
-							log_error("Error computing fine value");
-							return ret;
-						}
+						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
+						state->fine_ctrl_value  = (uint16_t) (state->fine_ctrl_value + delta_fine);
 					}
 					else{
 						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
