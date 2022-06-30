@@ -379,8 +379,8 @@ static void init_temperature_table(struct algorithm_state *state, struct minipod
 		union fine_value fine = {
 			.fine_estimated_equilibrium_ES = (float) disciplining_parameters->mean_fine_over_temperature[i] / 10.0
 		};
-		if (fine.fine_estimated_equilibrium_ES >= -FINE_MID_RANGE_MAX
-			&& fine.fine_estimated_equilibrium_ES <= FINE_MID_RANGE_MAX) {
+		if (fine.fine_estimated_equilibrium_ES > FINE_RANGE_MIN
+			&& fine.fine_estimated_equilibrium_ES <= FINE_RANGE_MAX) {
 			log_debug("Writing mean value of %.2f in temperature range [%.2f, %.2f[",
 				fine.fine_estimated_equilibrium_ES,
 				(i + STEPS_BY_DEGREE * MIN_TEMPERATURE) / STEPS_BY_DEGREE,
