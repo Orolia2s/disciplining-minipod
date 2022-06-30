@@ -360,7 +360,7 @@ static void init_temperature_table(struct algorithm_state *state, struct minipod
 	}
 
 	for (i = 0; i < MEAN_TEMPERATURE_ARRAY_MAX; i++) {
-		float fine = (float) disciplining_parameters->mean_fine_over_temperature[i] / 10.0;
+		float fine = (float) disciplining_parameters->temperature_table.mean_fine_over_temperature[i] / 10.0;
 		if (fine >= FINE_MID_RANGE_MIN && fine <= FINE_MID_RANGE_MAX) {
 			log_debug("Temperature table: Adding mean value of %.2f in temperature range [%.2f, %.2f[",
 				fine,
@@ -389,6 +389,7 @@ static int init_algorithm_state(struct od * od) {
 	int ret;
 	struct algorithm_state *state = &od->state;
 	struct disciplining_parameters *dsc_parameters = &od->dsc_parameters;
+	struct eeprom_config_parameters *eeprom_cfg = &od->dsc_parameters.eeprom_cfg;
 	struct minipod_config *config = &od->minipod_config;
 
 	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
@@ -434,9 +435,9 @@ static int init_algorithm_state(struct od * od) {
 		log_debug("Using factory settings");
 		ret = init_ctrl_points(
 			state,
-			dsc_parameters->ctrl_load_nodes_factory,
-			dsc_parameters->ctrl_drift_coeffs_factory,
-			dsc_parameters->ctrl_nodes_length_factory
+			eeprom_cfg->ctrl_load_nodes_factory,
+			eeprom_cfg->ctrl_drift_coeffs_factory,
+			eeprom_cfg->ctrl_nodes_length_factory
 		);
 	} else {
 		/*
@@ -446,16 +447,16 @@ static int init_algorithm_state(struct od * od) {
 		 * If this fail factory parameters will override user parameters
 		 * and we will initialize using factory parameters
 		 */
-		if (!dsc_parameters->calibration_valid) {
+		if (!eeprom_cfg->calibration_valid) {
 			log_warn("Calibration parameters are not valid for this card. Factory settings will be used.");
 			ret = -1;
 		} else {
 			/* Init control points with user parameters */
 			ret = init_ctrl_points(
 				state,
-				dsc_parameters->ctrl_load_nodes,
-				dsc_parameters->ctrl_drift_coeffs,
-				dsc_parameters->ctrl_nodes_length
+				eeprom_cfg->ctrl_load_nodes,
+				eeprom_cfg->ctrl_drift_coeffs,
+				eeprom_cfg->ctrl_nodes_length
 			);
 		}
 		if (ret != 0) {
@@ -463,19 +464,19 @@ static int init_algorithm_state(struct od * od) {
 			log_warn("User parameters are corrupted, trying to use factory parameters");
 			ret = init_ctrl_points(
 				state,
-				dsc_parameters->ctrl_load_nodes_factory,
-				dsc_parameters->ctrl_drift_coeffs_factory,
-				dsc_parameters->ctrl_nodes_length_factory
+				eeprom_cfg->ctrl_load_nodes_factory,
+				eeprom_cfg->ctrl_drift_coeffs_factory,
+				eeprom_cfg->ctrl_nodes_length_factory
 			);
 			if (ret == 0) {
 				log_info("Factory parameters can be used, resetting user parameters to factory ones");
-				dsc_parameters->ctrl_nodes_length = dsc_parameters->ctrl_nodes_length_factory;
-				dsc_parameters->coarse_equilibrium = dsc_parameters->coarse_equilibrium_factory;
-				for (i = 0; i < dsc_parameters->ctrl_nodes_length; i++) {
-					dsc_parameters->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs_factory[i];
-					dsc_parameters->ctrl_load_nodes[i] = dsc_parameters->ctrl_load_nodes_factory[i];
+				eeprom_cfg->ctrl_nodes_length = eeprom_cfg->ctrl_nodes_length_factory;
+				eeprom_cfg->coarse_equilibrium = eeprom_cfg->coarse_equilibrium_factory;
+				for (i = 0; i < eeprom_cfg->ctrl_nodes_length; i++) {
+					eeprom_cfg->ctrl_drift_coeffs[i] = eeprom_cfg->ctrl_drift_coeffs_factory[i];
+					eeprom_cfg->ctrl_load_nodes[i] = eeprom_cfg->ctrl_load_nodes_factory[i];
 				}
-				dsc_parameters->estimated_equilibrium_ES = 0;
+				eeprom_cfg->estimated_equilibrium_ES = 0;
 			}
 		}
 
@@ -483,28 +484,28 @@ static int init_algorithm_state(struct od * od) {
 	if (ret != 0) {
 		/* If factory parameters cannot be used then we reset both factory and user parameters to default values */
 		log_warn("Could not initialize algorithm with factory data from config, resetting default parameters");
-		dsc_parameters->ctrl_nodes_length = 3;
-		dsc_parameters->ctrl_load_nodes[0] = 0.25;
-		dsc_parameters->ctrl_load_nodes[1] = 0.5;
-		dsc_parameters->ctrl_load_nodes[2] = 0.75;
-		dsc_parameters->ctrl_drift_coeffs[0] = 1.2;
-		dsc_parameters->ctrl_drift_coeffs[1] = 0.0;
-		dsc_parameters->ctrl_drift_coeffs[2] = -1.2;
-		dsc_parameters->coarse_equilibrium = -1;
-		dsc_parameters->ctrl_load_nodes_factory[0] = 0.25;
-		dsc_parameters->ctrl_load_nodes_factory[1] = 0.5;
-		dsc_parameters->ctrl_load_nodes_factory[2] = 0.75;
-		dsc_parameters->ctrl_drift_coeffs_factory[0] = 1.2;
-		dsc_parameters->ctrl_drift_coeffs_factory[1] = 0.0;
-		dsc_parameters->ctrl_drift_coeffs_factory[2] = -1.2;
-		dsc_parameters->coarse_equilibrium_factory = -1;
-		dsc_parameters->calibration_valid = false;
+		eeprom_cfg->ctrl_nodes_length = 3;
+		eeprom_cfg->ctrl_load_nodes[0] = 0.25;
+		eeprom_cfg->ctrl_load_nodes[1] = 0.5;
+		eeprom_cfg->ctrl_load_nodes[2] = 0.75;
+		eeprom_cfg->ctrl_drift_coeffs[0] = 1.2;
+		eeprom_cfg->ctrl_drift_coeffs[1] = 0.0;
+		eeprom_cfg->ctrl_drift_coeffs[2] = -1.2;
+		eeprom_cfg->coarse_equilibrium = -1;
+		eeprom_cfg->ctrl_load_nodes_factory[0] = 0.25;
+		eeprom_cfg->ctrl_load_nodes_factory[1] = 0.5;
+		eeprom_cfg->ctrl_load_nodes_factory[2] = 0.75;
+		eeprom_cfg->ctrl_drift_coeffs_factory[0] = 1.2;
+		eeprom_cfg->ctrl_drift_coeffs_factory[1] = 0.0;
+		eeprom_cfg->ctrl_drift_coeffs_factory[2] = -1.2;
+		eeprom_cfg->coarse_equilibrium_factory = -1;
+		eeprom_cfg->calibration_valid = false;
 		config->calibrate_first = false;
 		ret = init_ctrl_points(
 			state,
-			dsc_parameters->ctrl_load_nodes,
-			dsc_parameters->ctrl_drift_coeffs,
-			dsc_parameters->ctrl_nodes_length
+			eeprom_cfg->ctrl_load_nodes,
+			eeprom_cfg->ctrl_drift_coeffs,
+			eeprom_cfg->ctrl_nodes_length
 		);
 		if (ret != 0)
 			return ret;
@@ -515,8 +516,8 @@ static int init_algorithm_state(struct od * od) {
 		log_error("Error computing fine value from control drift coefficients");
 		return ret;
 	}
-	if (dsc_parameters->estimated_equilibrium_ES != 0)
-		state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+	if (eeprom_cfg->estimated_equilibrium_ES != 0)
+		state->estimated_equilibrium_ES = (float) eeprom_cfg->estimated_equilibrium_ES;
 	else
 		state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 	log_info("Initialization: Estimated equilibrium is %d and estimated equilibrium ES is %f", state->estimated_equilibrium, state->estimated_equilibrium_ES);
@@ -573,8 +574,8 @@ static bool control_check_mRO(struct od *od, const struct od_input *input, struc
 		}
 		log_debug("All coefficients are inferior to %f in absolute value", DRIFT_COEFFICIENT_ABSOLUTE_MAX);
 
-		dsc_parameters->coarse_equilibrium = input->coarse_setpoint;
-		dsc_parameters->calibration_valid = true;
+		dsc_parameters->eeprom_cfg.coarse_equilibrium = input->coarse_setpoint;
+		dsc_parameters->eeprom_cfg.calibration_valid = true;
 		return true;
 	} else if (state->calib) {
 		log_info("Coarse alignment must be adjusted based on calibration");
@@ -670,7 +671,7 @@ int od_process(struct od *od, const struct od_input *input,
 	);
 
 	struct algorithm_state *state = &(od->state);
-	struct disciplining_parameters *dsc_parameters = &(od->dsc_parameters);
+	struct eeprom_config_parameters *eeprom_cfg = &(od->dsc_parameters.eeprom_cfg);
 	struct minipod_config *config = &(od->minipod_config);
 
 	/* If tracking only is not forced by configuration
@@ -767,26 +768,26 @@ int od_process(struct od *od, const struct od_input *input,
 				 * and that coarse set on mRO50 is equal to coarse_equilibrium_factory
 				 */
 				if (config->oscillator_factory_settings
-					&& dsc_parameters->coarse_equilibrium_factory > 0
-					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium_factory) {
-					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium_factory, 0);
-					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+					&& eeprom_cfg->coarse_equilibrium_factory > 0
+					&& input->coarse_setpoint != eeprom_cfg->coarse_equilibrium_factory) {
+					set_output(output, ADJUST_COARSE, eeprom_cfg->coarse_equilibrium_factory, 0);
+					log_info("INITIALIZATION: Applying factory coarse equilibrium setpoint %d", eeprom_cfg->coarse_equilibrium);
 				/*
 				 * Check if algorithm is using user settings
 				 * if so check if coarse_equilibrium is superior to 0 (known coarse_equilibrium)
 				 * and that coarse set on mRO50 is equal to coarse_equilibrium
 				 */
 				} else if (!config->oscillator_factory_settings
-					&& dsc_parameters->coarse_equilibrium > 0
-					&& input->coarse_setpoint != dsc_parameters->coarse_equilibrium) {
-					set_output(output, ADJUST_COARSE, dsc_parameters->coarse_equilibrium, 0);
-					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", dsc_parameters->coarse_equilibrium);
+					&& eeprom_cfg->coarse_equilibrium > 0
+					&& input->coarse_setpoint != eeprom_cfg->coarse_equilibrium) {
+					set_output(output, ADJUST_COARSE, eeprom_cfg->coarse_equilibrium, 0);
+					log_info("INITIALIZATION: Applying coarse equilibrium setpoint %d", eeprom_cfg->coarse_equilibrium);
 				} else {
 					/*
 					 * Check if coarse is known, wether we are using factory settings or not
 					 */
-					if ((!config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium < 0) ||
-						(config->oscillator_factory_settings && dsc_parameters->coarse_equilibrium_factory < 0)) {
+					if ((!config->oscillator_factory_settings && eeprom_cfg->coarse_equilibrium < 0) ||
+						(config->oscillator_factory_settings && eeprom_cfg->coarse_equilibrium_factory < 0)) {
 						log_warn("Unknown coarse_equilibrium in current config, using value saved in oscillator,"
 							"consider calibration if disciplining is not efficient");
 					}
@@ -921,11 +922,11 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Check if we reached convergence enough time to switch to lock low resolution */
 						if (state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)) {
 							/* Update estimated equilibrium ES in discplining parameters */
-							od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+							eeprom_cfg->estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 							/* Consider card as calibrated if user parameters are used */
 							if (!od->minipod_config.oscillator_factory_settings) {
-								od->dsc_parameters.calibration_valid = true;
-								od->dsc_parameters.calibration_date = time(NULL);
+								eeprom_cfg->calibration_valid = true;
+								eeprom_cfg->calibration_date = time(NULL);
 							}
 							/* Smooth convergence reached, adjust to estimated equilibrium smooth */
 							log_info("Smoothing convergence reached");
@@ -954,15 +955,15 @@ int od_process(struct od *od, const struct od_input *input,
 							set_state(state, TRACKING);
 
 							/* Update estimated equilibrium ES to initial guess */
-							if (dsc_parameters->estimated_equilibrium_ES != 0)
-								state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+							if (eeprom_cfg->estimated_equilibrium_ES != 0)
+								state->estimated_equilibrium_ES = (float) eeprom_cfg->estimated_equilibrium_ES;
 							else
 								state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 							if (config->oscillator_factory_settings)
-								dsc_parameters->coarse_equilibrium_factory = new_coarse;
+								eeprom_cfg->coarse_equilibrium_factory = new_coarse;
 							else
-								dsc_parameters->coarse_equilibrium = new_coarse;
+								eeprom_cfg->coarse_equilibrium = new_coarse;
 							return 0;
 						}
 					}
@@ -1064,15 +1065,15 @@ int od_process(struct od *od, const struct od_input *input,
 					set_state(state, TRACKING);
 
 					/* Update estimated equilibrium ES to initial guess*/
-					if (dsc_parameters->estimated_equilibrium_ES != 0)
-						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+					if (eeprom_cfg->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = (float) eeprom_cfg->estimated_equilibrium_ES;
 					else
 						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 					if (config->oscillator_factory_settings)
-						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+						eeprom_cfg->coarse_equilibrium_factory = new_coarse;
 					else
-						dsc_parameters->coarse_equilibrium = new_coarse;
+						eeprom_cfg->coarse_equilibrium = new_coarse;
 					return 0;
 				}
 
@@ -1199,7 +1200,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
-					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+					eeprom_cfg->estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					if (fabs(mean_phase_error) <= 10.0) {
 						/* Add fine values into fine ciruclar buffer for temperature impact */
@@ -1260,15 +1261,15 @@ int od_process(struct od *od, const struct od_input *input,
 					set_state(state, TRACKING);
 
 					/* Update estimated equilibrium ES to initial guess*/
-					if (dsc_parameters->estimated_equilibrium_ES != 0)
-						state->estimated_equilibrium_ES = (float) dsc_parameters->estimated_equilibrium_ES;
+					if (eeprom_cfg->estimated_equilibrium_ES != 0)
+						state->estimated_equilibrium_ES = (float) eeprom_cfg->estimated_equilibrium_ES;
 					else
 						state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
 					if (config->oscillator_factory_settings)
-						dsc_parameters->coarse_equilibrium_factory = new_coarse;
+						eeprom_cfg->coarse_equilibrium_factory = new_coarse;
 					else
-						dsc_parameters->coarse_equilibrium = new_coarse;
+						eeprom_cfg->coarse_equilibrium = new_coarse;
 					return 0;
 				}
 
@@ -1397,7 +1398,7 @@ int od_process(struct od *od, const struct od_input *input,
 					log_info("Estimated equilibrium with exponential smooth is %f",
 						state->estimated_equilibrium_ES);
 					/* Update estimated equilibrium ES in discplining parameters */
-					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
+					eeprom_cfg->estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					if (fabs(mean_phase_error) < 10.0) {
 						/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
@@ -1489,9 +1490,9 @@ static void update_temperature_mean_values(struct disciplining_parameters* disci
 	/* Copy only range between 30 and 49 for now */
 	for (i = 0; i < MEAN_TEMPERATURE_ARRAY_MAX; i ++) {
 		if (compute_mean_value(&state->fine_estimated_es_buffer[i]) == 0) {
-			disciplining_parameters->mean_fine_over_temperature[i] = round(state->fine_estimated_es_buffer[i].mean_fine * 10.0);
+			disciplining_parameters->temperature_table.mean_fine_over_temperature[i] = round(state->fine_estimated_es_buffer[i].mean_fine * 10.0);
 		} else {
-			disciplining_parameters->mean_fine_over_temperature[i] = 0;
+			disciplining_parameters->temperature_table.mean_fine_over_temperature[i] = 0;
 		}
 	}
 	return;
@@ -1518,7 +1519,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		return NULL;
 	}
 
-	if (od->dsc_parameters.ctrl_nodes_length <= 0)
+	if (od->dsc_parameters.eeprom_cfg.ctrl_nodes_length <= 0)
 	{
 		log_error("get_calibration_parameters: Length cannot be negative");
 		return NULL;
@@ -1531,7 +1532,7 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		return NULL;
 	}
 
-	calib_params->ctrl_points = malloc(od->dsc_parameters.ctrl_nodes_length * sizeof(uint16_t));
+	calib_params->ctrl_points = malloc(od->dsc_parameters.eeprom_cfg.ctrl_nodes_length * sizeof(uint16_t));
 	if (calib_params->ctrl_points == NULL) {
 		log_error("Could not allocate memory to create ctrl points in calibration parameters data");
 		free(calib_params);
@@ -1539,12 +1540,12 @@ struct calibration_parameters * od_get_calibration_parameters(struct od *od)
 		return NULL;
 	}
 
-	for (i = 0; i < od->dsc_parameters.ctrl_nodes_length; i++)
+	for (i = 0; i < od->dsc_parameters.eeprom_cfg.ctrl_nodes_length; i++)
 	{
 		calib_params->ctrl_points[i] = od->state.ctrl_points[i];
 	}
 
-	calib_params->length = od->dsc_parameters.ctrl_nodes_length;
+	calib_params->length = od->dsc_parameters.eeprom_cfg.ctrl_nodes_length;
 	calib_params->nb_calibration = od->minipod_config.nb_calibration;
 	od->state.calib = true;
 	return calib_params;
@@ -1565,7 +1566,7 @@ static void free_calibration(struct calibration_parameters *calib_params, struct
 
 void od_calibrate(struct od *od, struct calibration_parameters *calib_params, struct calibration_results *calib_results)
 {
-	struct disciplining_parameters *dsc_parameters;
+	struct eeprom_config_parameters *eeprom_cfg;
 	struct algorithm_state *state;
 	int length;
 	int i, j;
@@ -1576,16 +1577,16 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 		log_error("od_calibration: at least one input parameter is null");
 		return;
 	}
-	dsc_parameters = &od->dsc_parameters;
+	eeprom_cfg = &od->dsc_parameters.eeprom_cfg;
 	state = &od->state;
 
-	if (calib_params->length != dsc_parameters->ctrl_nodes_length || calib_params->length != calib_results->length)
+	if (calib_params->length != eeprom_cfg->ctrl_nodes_length || calib_params->length != calib_results->length)
 	{
 		log_error("od_calibrate: length mismatch");
 		free_calibration(calib_params, calib_results);
 		return;
 	}
-	length = dsc_parameters->ctrl_nodes_length;
+	length = eeprom_cfg->ctrl_nodes_length;
 
 	if (calib_params->nb_calibration != calib_results->nb_calibration)
 	{
@@ -1623,12 +1624,12 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 			free_calibration(calib_params, calib_results);
 			return;
 		}
-		dsc_parameters->ctrl_drift_coeffs[i] = func_params.a;
-		log_debug("\t[%d]: %f", i, dsc_parameters->ctrl_drift_coeffs[i]);
+		eeprom_cfg->ctrl_drift_coeffs[i] = func_params.a;
+		log_debug("\t[%d]: %f", i, eeprom_cfg->ctrl_drift_coeffs[i]);
 	}
 
 	for (i = 0; i < length; i++)
-		state->ctrl_drift_coeffs[i] = dsc_parameters->ctrl_drift_coeffs[i];
+		state->ctrl_drift_coeffs[i] = eeprom_cfg->ctrl_drift_coeffs[i];
 
 	ret = compute_fine_value(state, 0, &state->estimated_equilibrium);
 	if (ret != 0) {
@@ -1647,7 +1648,7 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
 	}
 
 	state->mRO_fine_step_sensitivity = 1E-9
-		* ( dsc_parameters->ctrl_drift_coeffs[length - 1] - dsc_parameters->ctrl_drift_coeffs[0])
+		* ( eeprom_cfg->ctrl_drift_coeffs[length - 1] - eeprom_cfg->ctrl_drift_coeffs[0])
 		/ ( state->ctrl_points[length - 1] - state->ctrl_points[0] );
 
 	free_calibration(calib_params, calib_results);

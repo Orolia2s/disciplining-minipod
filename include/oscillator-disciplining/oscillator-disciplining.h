@@ -122,12 +122,7 @@ struct minipod_config {
 
 #define MIN_VALUES_FOR_MEAN 10
 
-/**
- * @struct disciplining parameters
- * @brief Disciplining parameters corresponding to mRO50 device disciplined
- *
- */
-struct disciplining_parameters {
+struct eeprom_config_parameters {
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -165,7 +160,20 @@ struct disciplining_parameters {
 	bool calibration_valid;
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
+};
+
+struct temperature_table {
 	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
+};
+
+/**
+ * @struct disciplining parameters
+ * @brief Disciplining parameters corresponding to mRO50 device disciplined
+ *
+ */
+struct disciplining_parameters {
+	struct eeprom_config_parameters eeprom_cfg;
+	struct temperature_table temperature_table;
 };
 
 /**
