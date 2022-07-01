@@ -197,7 +197,7 @@ static void set_output(struct od_output *output, enum output_action action, uint
 static void update_temperature(struct algorithm_state *state, float temperature, float smoothing_coefficient)
 {
 	/* Update smoothed temperature */
-	if (state->mRO_EP_temperature < -273.15) {
+	if (state->mRO_EP_temperature < -10.0) {
 		/* Init temperature to first value */
 		state->mRO_EP_temperature = temperature;
 	} else {
