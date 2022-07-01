@@ -900,19 +900,23 @@ int od_process(struct od *od, const struct od_input *input,
 					log_info("get_reactivity gives %f, react coeff is now %f", r, react_coeff);
 
 
+					int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
+					int new_value = 0;
 					if (state->current_phase_convergence_count <= round(12 / ALPHA_ES_TRACKING)){
-						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
-						state->fine_ctrl_value  = (uint16_t) (state->fine_ctrl_value + delta_fine);
-					}
-					else{
-						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
+						new_value = state->fine_ctrl_value + delta_fine;
+					} else {
 						if (abs(delta_fine) > TRACKING_ONLY_FINE_DELTA_MAX) {
 							delta_fine = delta_fine < 0 ?
 								-TRACKING_ONLY_FINE_DELTA_MAX :
 								TRACKING_ONLY_FINE_DELTA_MAX;
 						}
-						state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + delta_fine);
+						new_value  = (state->estimated_equilibrium_ES + delta_fine);
 					}
+					state->fine_ctrl_value  = (uint16_t) (
+						new_value < FINE_RANGE_MIN ? FINE_RANGE_MIN :
+						new_value > FINE_RANGE_MAX ? FINE_RANGE_MAX :
+						new_value
+					);
 					
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
