@@ -1512,17 +1512,30 @@ int od_process(struct od *od, const struct od_input *input,
 					/* Temperature compensation */
 					const float dc = 0.75;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
+					float temp_composite = state->holdover_mRO_EP_temperature + delta_temp_composite;
 					if (fabs(delta_temp_composite) > 0.1) {
-						float delta_fine_composite = get_fine_from_table(state, state->holdover_mRO_EP_temperature + delta_temp_composite);
-						float delta_fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature);
+						float temp_up = ceil(temp_composite*4)/4. + 0.125;
+						float temp_down = floor(temp_composite*4)/4. + 0.125;
+						log_debug("temp_up = %.2f, temp_down = %.2f",temp_up,temp_down);
+						float fine_temp_up = get_fine_from_table(state,temp_up);
+						float fine_temp_down = get_fine_from_table(state,temp_down);
 						
-						float fine_temperature_compensated = state->estimated_equilibrium_ES + (delta_fine_composite - delta_fine_holdover);
+						float fine_composite = 0.;
+						if (fabs(temp_up - temp_down) < 0.1){
+							fine_composite = get_fine_from_table(state, temp_composite);
+						}
+						else{
+							fine_composite = fine_temp_down + (temp_composite-temp_down)*(fine_temp_up-fine_temp_down)/(temp_up - temp_down);
+						}
+
+						float fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature);
+						float fine_temperature_compensated = state->estimated_equilibrium_ES + (fine_composite - fine_holdover);
 
 						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f,  state->estimated_equilibrium_ES=%.2f, delta_fine_composite=%.2f,delta_fine_holdover=%.2f",
 							fine_temperature_compensated,
 							state->estimated_equilibrium_ES,
-							delta_fine_composite,
-							delta_fine_holdover
+							fine_composite,
+							fine_holdover
 						);
 						if (fine_temperature_compensated >= FINE_RANGE_MIN && fine_temperature_compensated <= FINE_RANGE_MAX) {
 							float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
