@@ -1448,7 +1448,7 @@ int od_process(struct od *od, const struct od_input *input,
 					if (fabs(delta_temp_composite) > 0.1) {
 						float temp_up = ceil(temp_composite*4)/4. + 0.125;
 						float temp_down = floor(temp_composite*4)/4. + 0.125;
-						log_debug("temp_up = %.2f, temp_down = %.2f",temp_up,temp_down);
+						log_debug("temp_up = %.3f, temp_down = %.3f",temp_up,temp_down);
 						float fine_temp_up = get_fine_from_table(state,temp_up);
 						float fine_temp_down = get_fine_from_table(state,temp_down);
 						
