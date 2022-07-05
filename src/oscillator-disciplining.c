@@ -1030,11 +1030,9 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Phase jump needed */
 						set_output(output, PHASE_JUMP, 0, input->phase_error.tv_nsec);
 					} else {
-						/* Reset tracking state if convergence step is superior to value where phase jump is not allowed */
-						if (fabs(mean_phase_error) >= 1000) {
-							log_warn("Phase error too large, resetting Tracking state");
-							set_state(state, TRACKING);
-						}
+						/* Reset tracking state if phase error too large after convergence*/
+					    log_warn("Phase error too large, resetting Tracking state");
+					    set_state(state, TRACKING);
 						set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 					}
 					return 0;
