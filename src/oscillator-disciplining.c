@@ -989,7 +989,7 @@ int od_process(struct od *od, const struct od_input *input,
 						/* Do not add temperature value at the beginning of tracking */
 						if (config->learn_temperature_table
 							&& state->current_phase_convergence_count > round(6.0 / ALPHA_ES_TRACKING)
-							&& fabs(mean_phase_error) <= 10.0) {
+							&& fabs(mean_phase_error) <= config->ref_fluctuations_ns) {
 							/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
 							log_debug("Add fine estimated ES");
 							ret = add_fine_from_temperature(state->fine_estimated_es_buffer, state->estimated_equilibrium_ES, state->mRO_EP_temperature);
@@ -1208,7 +1208,7 @@ int od_process(struct od *od, const struct od_input *input,
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					if (config->learn_temperature_table
-						&& fabs(mean_phase_error) <= 10.0) {
+						&& fabs(mean_phase_error) <= config->ref_fluctuations_ns) {
 						/* Add fine values into fine ciruclar buffer for temperature impact */
 						/* Add fine Estimated ES values into fine circular buffer for temperature impact */
 						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, state->estimated_equilibrium_ES, state->mRO_EP_temperature);
@@ -1406,7 +1406,7 @@ int od_process(struct od *od, const struct od_input *input,
 					od->dsc_parameters.estimated_equilibrium_ES = (uint16_t) round(state->estimated_equilibrium_ES);
 
 					if (config->learn_temperature_table
-						&& fabs(mean_phase_error) < 10.0) {
+						&& fabs(mean_phase_error) < config->ref_fluctuations_ns) {
 						/* Add fine Estimated ES values into fine ciruclar buffer for temperature impact */
 						ret = add_fine_from_temperature(state->fine_estimated_es_buffer, state->estimated_equilibrium_ES, state->mRO_EP_temperature);
 						if (ret != 0) {
