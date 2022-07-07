@@ -46,34 +46,34 @@ static inline void print_minipod_config(struct minipod_config *config) {
 	log_debug("\t- tracking_only: %s", config->tracking_only ? "true" : "false");
 }
 
-static inline void print_disciplining_parameters(struct disciplining_parameters *params)
+static inline void print_disciplining_config(struct disciplining_config *dsc_config)
 {
 	int i = 0;
 	log_debug("Discipining Parameters:");
-	log_debug("\t- ctrl_nodes_length: %d", params->ctrl_nodes_length);
+	log_debug("\t- ctrl_nodes_length: %d", dsc_config->ctrl_nodes_length);
 
 	log_debug("\t- ctrl_load_nodes:");
-	for (i = 0; i < params->ctrl_nodes_length; i++)
-		log_debug("\t\t- [%d]: %f", i, params->ctrl_load_nodes[i]);
+	for (i = 0; i < dsc_config->ctrl_nodes_length; i++)
+		log_debug("\t\t- [%d]: %f", i, dsc_config->ctrl_load_nodes[i]);
 
 	log_debug("\t- ctrl_drift_coeffs]:");
-	for (i = 0; i < params->ctrl_nodes_length; i++)
-		log_debug("\t\t- [%d]: %f", i, params->ctrl_drift_coeffs[i]);
+	for (i = 0; i < dsc_config->ctrl_nodes_length; i++)
+		log_debug("\t\t- [%d]: %f", i, dsc_config->ctrl_drift_coeffs[i]);
 
-	log_debug("\t- coarse_equilibrium: %d", params->coarse_equilibrium);
+	log_debug("\t- coarse_equilibrium: %d", dsc_config->coarse_equilibrium);
 
 
-	log_debug("\t- ctrl_nodes_length_factory: %d", params->ctrl_nodes_length_factory);
+	log_debug("\t- ctrl_nodes_length_factory: %d", dsc_config->ctrl_nodes_length_factory);
 
 	log_debug("\t- ctrl_load_nodes_factory:");
-	for (i = 0; i < params->ctrl_nodes_length_factory; i++)
-		log_debug("\t\t- [%d]: %f", i, params->ctrl_load_nodes_factory[i]);
+	for (i = 0; i < dsc_config->ctrl_nodes_length_factory; i++)
+		log_debug("\t\t- [%d]: %f", i, dsc_config->ctrl_load_nodes_factory[i]);
 	log_debug("\t- ctrl_drift_coeffs_factory:");
-	for (i = 0; i < params->ctrl_nodes_length_factory; i++)
-		log_debug("\t\t- [%d]: %f", i, params->ctrl_drift_coeffs_factory[i]);
-	log_debug("\t- coarse_equilibrium_factory: %d", params->coarse_equilibrium_factory);
+	for (i = 0; i < dsc_config->ctrl_nodes_length_factory; i++)
+		log_debug("\t\t- [%d]: %f", i, dsc_config->ctrl_drift_coeffs_factory[i]);
+	log_debug("\t- coarse_equilibrium_factory: %d", dsc_config->coarse_equilibrium_factory);
 
-	log_debug("\t- calibration_valid: %s", params->calibration_valid ? "true" : "false");
+	log_debug("\t- calibration_valid: %s", dsc_config->calibration_valid ? "true" : "false");
 }
 
 

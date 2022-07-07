@@ -40,16 +40,18 @@ struct minipod_config minipod_config = {
 };
 
 struct disciplining_parameters disciplining_parameters = {
-    .ctrl_load_nodes = { 0.0, 0.25, 0.75 },
-    .ctrl_drift_coeffs = { 1.21, 0.000001, -1.21 },
-    .ctrl_load_nodes_factory = { 0.0, 0.5, 1.0 },
-    .ctrl_drift_coeffs_factory = { 1.2, 0.0, -1.2 },
-    .coarse_equilibrium_factory = -1,
-    .coarse_equilibrium = -1,
-    .calibration_date = 0,
-    .ctrl_nodes_length_factory = 3,
-    .ctrl_nodes_length = 3,
-    .calibration_valid = 0,
+    .dsc_config = {
+        .ctrl_load_nodes = { 0.0, 0.25, 0.75 },
+        .ctrl_drift_coeffs = { 1.21, 0.000001, -1.21 },
+        .ctrl_load_nodes_factory = { 0.0, 0.5, 1.0 },
+        .ctrl_drift_coeffs_factory = { 1.2, 0.0, -1.2 },
+        .coarse_equilibrium_factory = -1,
+        .coarse_equilibrium = -1,
+        .calibration_date = 0,
+        .ctrl_nodes_length_factory = 3,
+        .ctrl_nodes_length = 3,
+        .calibration_valid = 0,
+    }
 };
 
 /**
@@ -68,29 +70,30 @@ int main(int argc, char *argv[])
 
     printf("*** TEST GET FACTORY DISCIPLINING PARAMETERS ***\n");
     /* Test od_get_calibration_parameters */
-    struct disciplining_parameters current_config;
+    struct disciplining_parameters dsc_params;
 
-    int ret = od_get_disciplining_parameters(od, &current_config);
+    int ret = od_get_disciplining_parameters(od, &dsc_params);
+    struct disciplining_config *current_config = &dsc_params.dsc_config;
     assert(ret == 0);
-    assert(current_config.calibration_valid == 0);
-    assert(current_config.ctrl_load_nodes[0] == 0.0);
-    assert(current_config.ctrl_load_nodes[1] == 0.25);
-    assert(current_config.ctrl_load_nodes[2] == 0.75);
-    assert(compare_float(current_config.ctrl_drift_coeffs[0], 1.21) == 1);
-    assert(compare_float(current_config.ctrl_drift_coeffs[1], 0.000001) == 1);
-    assert(compare_float(current_config.ctrl_drift_coeffs[2], -1.21) == 1);
-    assert(current_config.ctrl_load_nodes_factory[0] == 0.0);
-    assert(current_config.ctrl_load_nodes_factory[1] == 0.5);
-    assert(current_config.ctrl_load_nodes_factory[2] == 1.0);
-    assert(compare_float(current_config.ctrl_drift_coeffs_factory[0], 1.2) == 1);
-    assert(compare_float(current_config.ctrl_drift_coeffs_factory[1], 0.0) == 1);
-    assert(compare_float(current_config.ctrl_drift_coeffs_factory[2], -1.2) == 1);
-    assert(current_config.coarse_equilibrium_factory == -1);
-    assert(current_config.coarse_equilibrium == -1);
-    assert(current_config.calibration_date == 0);
-    assert(current_config.ctrl_nodes_length_factory == 3);
-    assert(current_config.ctrl_nodes_length == 3);
-    assert(current_config.calibration_valid == 0);
+    assert(current_config->calibration_valid == 0);
+    assert(current_config->ctrl_load_nodes[0] == 0.0);
+    assert(current_config->ctrl_load_nodes[1] == 0.25);
+    assert(current_config->ctrl_load_nodes[2] == 0.75);
+    assert(compare_float(current_config->ctrl_drift_coeffs[0], 1.21) == 1);
+    assert(compare_float(current_config->ctrl_drift_coeffs[1], 0.000001) == 1);
+    assert(compare_float(current_config->ctrl_drift_coeffs[2], -1.21) == 1);
+    assert(current_config->ctrl_load_nodes_factory[0] == 0.0);
+    assert(current_config->ctrl_load_nodes_factory[1] == 0.5);
+    assert(current_config->ctrl_load_nodes_factory[2] == 1.0);
+    assert(compare_float(current_config->ctrl_drift_coeffs_factory[0], 1.2) == 1);
+    assert(compare_float(current_config->ctrl_drift_coeffs_factory[1], 0.0) == 1);
+    assert(compare_float(current_config->ctrl_drift_coeffs_factory[2], -1.2) == 1);
+    assert(current_config->coarse_equilibrium_factory == -1);
+    assert(current_config->coarse_equilibrium == -1);
+    assert(current_config->calibration_date == 0);
+    assert(current_config->ctrl_nodes_length_factory == 3);
+    assert(current_config->ctrl_nodes_length == 3);
+    assert(current_config->calibration_valid == 0);
     printf("*** TEST PASSED ***\n\n");
 
     printf("*** TEST GET CALIBRATION PARAMETERS ***\n");

@@ -124,12 +124,19 @@ struct minipod_config {
 
 #define MIN_VALUES_FOR_MEAN CIRCULAR_BUFFER_SIZE
 
+#define DISCIPLINING_CONFIG_VERSION 1
+#define disciplining_parameters disciplining_parameters_V_1
+#define disciplining_config disciplining_config_V_1
+#define temperature_table temperature_table_V_1
+
+#define HEADER_MAGIC 'O'
 /**
- * @struct disciplining parameters
+ * @struct disciplining_parameters_V0
  * @brief Disciplining parameters corresponding to mRO50 device disciplined
  *
  */
-struct disciplining_parameters {
+
+struct disciplining_parameters_V_0 {
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -168,6 +175,59 @@ struct disciplining_parameters {
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
 	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
+};
+
+struct disciplining_config_V_1 {
+	uint8_t header;
+	uint8_t version;
+	/**
+	 * Array containing the control node, in percentage
+	 * value of the control range.
+	 * Array contains ctrl_nodes_length valid values.
+	 */
+	float ctrl_load_nodes[CALIBRATION_POINTS_MAX];
+	/**
+	 * Array of drift coefficients for each control node.
+	 * Array contains ctrl_nodes_length valid values.
+	 */
+	float ctrl_drift_coeffs[CALIBRATION_POINTS_MAX];
+	/** Equilibrium Coarse value define during calibration */
+	/**
+	 * Array containing the control node, in percentage
+	 * value of the control range.
+	 * Array contains ctrl_nodes_length_factory valid values.
+	 */
+	float ctrl_load_nodes_factory[3];
+	/**
+	 * Array of drift coefficients for each control node.
+	 * Array contains ctrl_nodes_length_factory valid values.
+	 */
+	float ctrl_drift_coeffs_factory[3];
+	/** Equilibrium Coarse value for factory_settings */
+	int32_t coarse_equilibrium_factory;
+	int32_t coarse_equilibrium;
+	/** Date at which calibration has been made */
+	time_t calibration_date;
+	/** Factory Settings that can be used with any mRO50 */
+	/** Number of control nodes in ctrl_load_nodes_factory */
+	uint8_t ctrl_nodes_length_factory;
+	/** Number of control nodes in ctrl_load_nodes */
+	uint8_t ctrl_nodes_length;
+	/** Indicate wether calibration parameters are valid */
+	bool calibration_valid;
+	/** estimated_equilibrium ES from previous tracking phases */
+	uint16_t estimated_equilibrium_ES;
+};
+
+struct temperature_table_V_1 {
+	uint8_t header;
+	uint8_t version;
+	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
+};
+
+struct disciplining_parameters_V_1 {
+	struct disciplining_config_V_1 dsc_config;
+	struct temperature_table_V_1 temp_table;
 };
 
 /**
