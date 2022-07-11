@@ -43,7 +43,6 @@ static inline void print_minipod_config(struct minipod_config *config) {
 	log_debug("\t- fine_stop_tolerance: %d", config->fine_stop_tolerance);
 	log_debug("\t- calibrate_first: %s", config->calibrate_first ? "true" : "false");
 	log_debug("\t- oscillator_factory_settings: %s", config->oscillator_factory_settings ? "true" : "false");
-	log_debug("\t- tracking_only: %s", config->tracking_only ? "true" : "false");
 }
 
 static inline void print_disciplining_config(struct disciplining_config *dsc_config)

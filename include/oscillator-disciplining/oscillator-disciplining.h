@@ -97,8 +97,6 @@ struct minipod_config {
 	bool calibrate_first;
 	/** Define wether to use factory settings or not */
 	bool oscillator_factory_settings;
-	/** Set the track only mode */
-	bool tracking_only;
 	/** Set to learn temperature table during disciplining */
 	bool learn_temperature_table;
 	/** file path to store temperature fine table */
@@ -303,10 +301,6 @@ enum Disciplining_State {
 	HOLDOVER,
 	/** Calibration state, when drift coefficients are computed */
 	CALIBRATION,
-	/** Low resolution lock mode */
-	LOCK_LOW_RESOLUTION,
-	/** High resolution lock mode */
-	LOCK_HIGH_RESOLUTION,
 	NUM_STATES
 };
 
