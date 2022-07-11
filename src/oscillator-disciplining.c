@@ -1459,41 +1459,55 @@ int od_process(struct od *od, const struct od_input *input,
 						log_debug("temp_up = %.3f, temp_down = %.3f",temp_up,temp_down);
 						float fine_temp_up = get_fine_from_table(state,temp_up);
 						float fine_temp_down = get_fine_from_table(state,temp_down);
+						float fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature) > 0.0 ?
+							get_fine_from_table(state, state->holdover_mRO_EP_temperature) :
+							state->estimated_equilibrium_ES;
 						
-						float fine_composite = 0.;
-						if (fabs(temp_up - temp_down) < 0.1){
-							fine_composite = get_fine_from_table(state, temp_composite);
-						}
-						else{
-							fine_composite = fine_temp_down + (temp_composite-temp_down)*(fine_temp_up-fine_temp_down)/(temp_up - temp_down);
-						}
-
-						float fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature);
-						float fine_temperature_compensated = state->estimated_equilibrium_ES + (fine_composite - fine_holdover);
-
-						log_debug("Temperature Compensation: fine_temperature_compensated=%.2f,  state->estimated_equilibrium_ES=%.2f, delta_fine_composite=%.2f,delta_fine_holdover=%.2f",
-							fine_temperature_compensated,
-							state->estimated_equilibrium_ES,
-							fine_composite,
-							fine_holdover
-						);
-						if (fine_temperature_compensated >= FINE_RANGE_MIN && fine_temperature_compensated <= FINE_RANGE_MAX) {
-							float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
-
-							float effective_coefficient = delta_fine_temperature/delta_temp_composite;
-							log_debug("Temperature Compensation: state->estimated_equilibrium_ES=%.2f, delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
-									state->estimated_equilibrium_ES,
-									delta_temp_composite,
-									delta_fine_temperature,
-									effective_coefficient);
-#define MAX_DELTA_FINE_COEFFICIENT 100.0
-							if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
-								delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
-								log_warn("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
-							}
-							fine_applied_in_holdover += delta_fine_temperature;
+						float fine_composite = 0.0;
+						if (fine_temp_up < 0.0 || fine_temp_down < 0.0) {
+							/*
+							 * At least one of the fine for tempetarure is not filled in temperature table
+							 * No compensation is applied
+							 */
+							set_output(output, NO_OP, 0, 0);
+							if (fine_temp_up < 0.0 || fine_temp_down < 0.0)
+								log_warn("Learned temperature table is not filled for %.2f, No extra compensation is applied", temp_composite);
+							return 0;
 						} else {
-							log_error("Inconsistent fine temperature compensated computed: %.2f", fine_temperature_compensated);
+							/* Temperature table is known at this temperature range, we can apply extra compensation */
+							if (fabs(temp_up - temp_down) < 0.1) {
+								/* As fine_temp_up and fine_temp_down are not negative, fine_composite cannot be negative */
+								fine_composite = get_fine_from_table(state, temp_composite);
+							} else {
+								fine_composite = fine_temp_down + (temp_composite-temp_down)*(fine_temp_up-fine_temp_down)/(temp_up - temp_down);
+							}
+
+							float fine_temperature_compensated = state->estimated_equilibrium_ES + (fine_composite - fine_holdover);
+
+							log_debug("Temperature Compensation: fine_temperature_compensated=%.2f,  state->estimated_equilibrium_ES=%.2f, fine_composite=%.2f,fine_holdover=%.2f",
+								fine_temperature_compensated,
+								state->estimated_equilibrium_ES,
+								fine_composite,
+								fine_holdover
+							);
+							if (fine_temperature_compensated >= FINE_RANGE_MIN && fine_temperature_compensated <= FINE_RANGE_MAX) {
+								float delta_fine_temperature = fine_temperature_compensated - state->estimated_equilibrium_ES;
+
+								float effective_coefficient = delta_fine_temperature/delta_temp_composite;
+								log_debug("Temperature Compensation: state->estimated_equilibrium_ES=%.2f, delta_temp_composite=%.2f, delta_fine=%.2f, effective_coefficient=%.2f",
+										state->estimated_equilibrium_ES,
+										delta_temp_composite,
+										delta_fine_temperature,
+										effective_coefficient);
+#define MAX_DELTA_FINE_COEFFICIENT 100.0
+								if (fabs(effective_coefficient) > MAX_DELTA_FINE_COEFFICIENT) {
+									delta_fine_temperature = MAX_DELTA_FINE_COEFFICIENT * delta_temp_composite * (effective_coefficient / fabs(effective_coefficient));
+									log_warn("Strong effective coefficient, bounding delta_fine_temperature to %.2f", delta_fine_temperature);
+								}
+								fine_applied_in_holdover += delta_fine_temperature;
+							} else {
+								log_error("Inconsistent fine temperature compensated computed: %.2f", fine_temperature_compensated);
+							}
 						}
 					}
 

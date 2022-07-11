@@ -181,78 +181,12 @@ int find_closest_right_circular_buffer_from_index(struct fine_circular_buffer *f
     return right_operand_index;
 }
 
-static float get_fine_from_default_temperature_compensation(float current_temperature, float reference_temperature, float reference_fine_value) {
-    if (compare_float(current_temperature, reference_temperature) == 1) {
-            return reference_fine_value;
-    } else if (current_temperature < reference_temperature) {
-        /* Temperature decreased from holdover entry */
-        if (reference_temperature < MIN_TEMPERATURE_DEFAULT) {
-            return reference_fine_value;
-        } else if (reference_temperature >= MAX_TEMPERATURE_DEFAULT) {
-            if (current_temperature < MIN_TEMPERATURE_DEFAULT) {
-                return reference_fine_value
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - reference_temperature)
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - MAX_TEMPERATURE_DEFAULT);
-            } else if (current_temperature >= MAX_TEMPERATURE_DEFAULT) {
-                return reference_fine_value
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - reference_temperature);
-            } else {
-                return reference_fine_value
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - reference_temperature)
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - MAX_TEMPERATURE_DEFAULT);
-            }
-        } else {
-            /* 30 <= reference_temperature < 40 */
-            if (current_temperature < MIN_TEMPERATURE_DEFAULT) {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MIN_TEMPERATURE_DEFAULT - reference_temperature);
-            } else {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - reference_temperature);
-            }
-        }
-    } else if(current_temperature > reference_temperature) {
-        /* Temperature increased from holdover entry */
-        if (reference_temperature < MIN_TEMPERATURE_DEFAULT) {
-            if (current_temperature < MIN_TEMPERATURE_DEFAULT) {
-                return reference_fine_value;
-            } else if (current_temperature >= MAX_TEMPERATURE_DEFAULT) {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - MIN_TEMPERATURE_DEFAULT)
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - MAX_TEMPERATURE_DEFAULT);
-            } else {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - MIN_TEMPERATURE_DEFAULT);
-            }
-        } else if (reference_temperature >= MAX_TEMPERATURE_DEFAULT) {
-            return reference_fine_value
-                + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - reference_temperature);
-        } else {
-            /* 30 <= reference_temperature < 40 */
-            if (current_temperature >= MAX_TEMPERATURE_DEFAULT) {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (MAX_TEMPERATURE_DEFAULT - reference_temperature)
-                    + 2 * DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - MAX_TEMPERATURE_DEFAULT);
-            } else {
-                return reference_fine_value
-                    + DEFAULT_DELTA_TEMPERATURE_COEFF * (current_temperature - reference_temperature);
-            }
-        }
-    }
-    return -1.0;
-}
-
-#define MID_TEMPERATURE_FROM_INDEX(i) (i + STEPS_BY_DEGREE * (MIN_TEMPERATURE + 0.5)) / STEPS_BY_DEGREE
-
 float get_fine_from_table(struct algorithm_state *state, float input_temperature)
 {
+    struct fine_circular_buffer *fine_buffer;
     int input_temperature_index;
-    int left_operand_index = -1;
-    int right_operand_index = -1;
-    float left_operand_temperature = -1.0;
-    float right_operand_temperature = -1.0;
 
-    struct fine_circular_buffer *fine_buffer = (struct fine_circular_buffer *) &state->fine_estimated_es_buffer;
+    fine_buffer = (struct fine_circular_buffer *) &state->fine_estimated_es_buffer;
     input_temperature_index = get_index_of_temperature(input_temperature);
 
     /* Check if a mean value can be computed on bin of input temperature */
@@ -260,46 +194,6 @@ float get_fine_from_table(struct algorithm_state *state, float input_temperature
         && input_temperature < MAX_TEMPERATURE
         && fine_buffer[input_temperature_index].buffer_length >= MIN_VALUES_FOR_MEAN) {
         return fine_buffer[input_temperature_index].mean_fine;
-    }
-
-    right_operand_index = find_closest_right_circular_buffer_from_index(fine_buffer, input_temperature_index);
-    left_operand_index = find_closest_left_circular_buffer_from_index(fine_buffer, input_temperature_index);
-
-    if (right_operand_index == -1 && left_operand_index == -1) {
-        log_error("Temperature Compensation: Using default behaviour with state->estimated_equilibrium_ES (%.2f) at state->holdover_mRO_EP_temperature (%.2f) as only point in temperature table",
-            state->estimated_equilibrium_ES,
-            state->holdover_mRO_EP_temperature
-        );
-        /* We have no value in table */
-        return get_fine_from_default_temperature_compensation(
-            input_temperature,
-            state->holdover_mRO_EP_temperature,
-            state->estimated_equilibrium_ES
-        );
-    /* From now on we know we have at least one value usable in the table */
-    } else if (right_operand_index != -1 && left_operand_index != -1) {
-        left_operand_temperature = MID_TEMPERATURE_FROM_INDEX(left_operand_index);
-        right_operand_temperature = MID_TEMPERATURE_FROM_INDEX(right_operand_index);
-
-        float coef_a = (fine_buffer[right_operand_index].mean_fine - fine_buffer[left_operand_index].mean_fine)
-            / (right_operand_temperature - left_operand_temperature);
-        return fine_buffer[left_operand_index].mean_fine + coef_a * (input_temperature - left_operand_temperature);
-    } else if (left_operand_index == -1) {
-        /* We have a mean value on the right side of the input temperature index */
-        right_operand_temperature = MID_TEMPERATURE_FROM_INDEX(right_operand_index);
-        return get_fine_from_default_temperature_compensation(
-            input_temperature,
-            right_operand_temperature,
-            fine_buffer[right_operand_index].mean_fine
-        );
-    } else {
-        /* We have a mean value on the left side of the input temperature */
-        left_operand_temperature = MID_TEMPERATURE_FROM_INDEX(left_operand_index);
-        return get_fine_from_default_temperature_compensation(
-            input_temperature,
-            left_operand_temperature,
-            fine_buffer[left_operand_index].mean_fine
-        );
     }
     return -1.0;
 }
