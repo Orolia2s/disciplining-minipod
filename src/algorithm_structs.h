@@ -150,8 +150,6 @@ struct algorithm_state {
 	uint16_t fine_ctrl_value;
 	/** Counts how many inputs has been given to minipod */
 	uint16_t od_inputs_count;
-	/** Number of inputs required for a particular state */
-	uint16_t od_inputs_for_state;
 	/** Estimated equilibrium value of the fine control */
 	uint16_t estimated_equilibrium;
 	/** Exponential Smooth of the estimated equilibrium */
@@ -171,8 +169,6 @@ struct algorithm_state {
 	/* Buffer to store fine estimated ES in temperature ranges */
 	struct fine_circular_buffer fine_estimated_es_buffer[TEMPERATURE_STEPS];
 	char fine_estimated_buffer_buffer_output_path[256];
-	/* Indicate tracking only is forced, wether by config or if SurveyIn does not complete */
-	bool tracking_only_forced;
 	/* Indicate wether going in Holdover state should display Holdover Clock Class or Uncalibrated */
 	bool ready_to_go_in_holdover_class;
 };
