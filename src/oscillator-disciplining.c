@@ -339,11 +339,15 @@ static void init_temperature_table(struct algorithm_state *state, struct minipod
 	}
 	sprintf(state->fine_estimated_buffer_buffer_output_path, "%s/fine_estimated_es_table.txt", config->fine_table_output_path);
 
-	if (config->learn_temperature_table) {
+	if (config->learn_temperature_table)
 		log_warn("Temperature table will be updated during disciplining");
-	} else {
+	else
 		log_info("Temperature table will not be updated during disciplining");
-	}
+
+	if (config->use_temperature_table)
+		log_info("Temperature table will be used for enhanced temperature compensation");
+	else
+		log_warn("Temperature table will not be used for enhanced temperature compensation");
 }
 
 /**
@@ -1014,7 +1018,7 @@ int od_process(struct od *od, const struct od_input *input,
 				log_info("Applying estimated equilibrium until going out of holdover");
 				if (state->status != HOLDOVER) {
 					set_state(state, HOLDOVER);
-				} else {
+				} else if(config->use_temperature_table) {
 					/* Temperature compensation */
 					const float dc = 0.75;
 					float delta_temp_composite = (state->mRO_EP_temperature - state->holdover_mRO_EP_temperature) + dc*(input->temperature - state->mRO_EP_temperature);
@@ -1076,10 +1080,11 @@ int od_process(struct od *od, const struct od_input *input,
 							}
 						}
 					}
-
-					log_debug("fine_applied_in_holdover is %.2f", fine_applied_in_holdover);
-					log_debug("Temperature when entering holdover was %.2f", state->holdover_mRO_EP_temperature);
+				} else {
+					log_info("Temperature Compensation: Using only mRo50 internal compensation");
 				}
+				log_debug("fine_applied_in_holdover is %.2f", fine_applied_in_holdover);
+				log_debug("Temperature when entering holdover was %.2f", state->holdover_mRO_EP_temperature);
 
 			} else {
 				log_warn("Bad GNSS: Waiting 3 bad cycles before entering holdover (%d/3)", state->gnss_ko_count);
