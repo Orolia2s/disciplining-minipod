@@ -99,6 +99,8 @@ struct minipod_config {
 	bool oscillator_factory_settings;
 	/** Set to learn temperature table during disciplining */
 	bool learn_temperature_table;
+	/** Wether to use temperature table or not for enhanced temperature compensation */
+	bool use_temperature_table;
 	/** file path to store temperature fine table */
 	const char *fine_table_output_path;
 };
