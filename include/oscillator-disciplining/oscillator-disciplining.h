@@ -136,7 +136,7 @@ struct minipod_config {
  *
  */
 
-struct disciplining_parameters_V_0 {
+struct __attribute__((__packed__)) disciplining_parameters_V_0 {
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -172,14 +172,16 @@ struct disciplining_parameters_V_0 {
 	uint8_t ctrl_nodes_length;
 	/** Indicate wether calibration parameters are valid */
 	bool calibration_valid;
+	uint8_t __padding0;
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
 	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
 };
 
-struct disciplining_config_V_1 {
+struct __attribute__((__packed__)) disciplining_config_V_1 {
 	uint8_t header;
 	uint8_t version;
+	uint8_t __pad0[2];
 	/**
 	 * Array containing the control node, in percentage
 	 * value of the control range.
@@ -206,6 +208,7 @@ struct disciplining_config_V_1 {
 	/** Equilibrium Coarse value for factory_settings */
 	int32_t coarse_equilibrium_factory;
 	int32_t coarse_equilibrium;
+	uint8_t __pad1[4];
 	/** Date at which calibration has been made */
 	time_t calibration_date;
 	/** Factory Settings that can be used with any mRO50 */
@@ -215,17 +218,18 @@ struct disciplining_config_V_1 {
 	uint8_t ctrl_nodes_length;
 	/** Indicate wether calibration parameters are valid */
 	bool calibration_valid;
+	uint8_t __pad2;
 	/** estimated_equilibrium ES from previous tracking phases */
 	uint16_t estimated_equilibrium_ES;
 };
 
-struct temperature_table_V_1 {
+struct __attribute__((__packed__)) temperature_table_V_1 {
 	uint8_t header;
 	uint8_t version;
 	uint16_t mean_fine_over_temperature[MEAN_TEMPERATURE_ARRAY_MAX];
 };
 
-struct disciplining_parameters_V_1 {
+struct __attribute__((__packed__)) disciplining_parameters_V_1 {
 	struct disciplining_config_V_1 dsc_config;
 	struct temperature_table_V_1 temp_table;
 };
