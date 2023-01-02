@@ -115,6 +115,27 @@ bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
 }
 
 /**
+ * @brief Define phasemeter status over a cycle
+ * by checking phasemeter status each input has
+ *
+ * @param inputs array of input data containing phasemeter status
+ * @param length array length
+ * @return phasemeter status over cycle is the last phasemeter status encountered in the windows
+ */
+enum art_phasemeter_status check_phasemeter_status_over_cycle(struct algorithm_input *inputs, int length)
+{
+	enum art_phasemeter_status phasemeter_status = PHASEMETER_ERROR;
+
+	if (inputs == NULL)
+		return false;
+	if (length <= 0)
+		return false;
+
+	phasemeter_status = inputs[length-1].phasemeter_status;
+	return phasemeter_status;
+}
+
+/**
  * @brief Check for each input that the absolute difference between input's phase error
  * and mean phase error is inferior to ref_fluctuation_ns
  *

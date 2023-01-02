@@ -380,7 +380,7 @@ static int init_algorithm_state(struct od * od) {
 	set_state(state, INIT);
 	state->calib = false;
 	state->fine_ctrl_value = 0;
-	state->gnss_ko_count = 0;
+	state->disciplining_ko_count = 0;
 
 	state->estimated_drift = 0;
 	state->current_phase_convergence_count = 0;
@@ -591,6 +591,7 @@ static void add_input_to_algorithm(struct algorithm_input *algorithm_input, cons
 	algorithm_input->phase_error = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
 	algorithm_input->valid = input->valid;
 	algorithm_input->lock = input->lock;
+	algorithm_input->phasemeter_status = input->phasemeter_status;
 }
 
 struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *dsc_params, char err_msg[OD_ERR_MSG_LEN])
@@ -672,14 +673,15 @@ int od_process(struct od *od, const struct od_input *input,
 
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, WINDOW_TRACKING);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, WINDOW_TRACKING);
+		enum art_phasemeter_status phasemeter_status = check_phasemeter_status_over_cycle(state->inputs, WINDOW_TRACKING);
 
 		float smoothing_coefficient = get_smooth_coefficient(state);
 		update_temperature(state, input->temperature, smoothing_coefficient);
 
-		/* Check if GNSS state is valid and mro50 is locked */
-		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
+		/* Check if GNSS state is valid and mro50 is locked and phasemeter is valid*/
+		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT) && (phasemeter_status == PHASEMETER_BOTH_TIMESTAMPS || phasemeter_status == PHASEMETER_INIT))
 		{
-			state->gnss_ko_count = 0;
+			state->disciplining_ko_count = 0;
 			if (od->state.status != CALIBRATION
 				&& (
 					config->calibrate_first
@@ -1000,7 +1002,7 @@ int od_process(struct od *od, const struct od_input *input,
 				return -1;
 			}
 		/* else if gnss is unstable, apply estimated equilibrium to prevent reaching holdover on an unstable state */
-		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
+		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state && (phasemeter_status == PHASEMETER_BOTH_TIMESTAMPS || phasemeter_status == PHASEMETER_INIT)) {
 			log_warn("Unstable GNSS: Applying estimated equilibrium");
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		/* else go into holdover mode if gnss is bad for 3 cycles */
@@ -1012,9 +1014,9 @@ int od_process(struct od *od, const struct od_input *input,
 
 			float fine_applied_in_holdover = state->estimated_equilibrium_ES;
 
-			state->gnss_ko_count++;
-			if (state->gnss_ko_count >= 3) {
-				log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost");
+			state->disciplining_ko_count++;
+			if (state->disciplining_ko_count >= 3) {
+				log_warn("HOLDOVER activated: GNSS data is not valid and/or oscillator's lock has been lost and/or phasemeter inconsistency");
 				log_info("Applying estimated equilibrium until going out of holdover");
 				if (state->status != HOLDOVER) {
 					set_state(state, HOLDOVER);
@@ -1087,7 +1089,7 @@ int od_process(struct od *od, const struct od_input *input,
 				log_debug("Temperature when entering holdover was %.2f", state->holdover_mRO_EP_temperature);
 
 			} else {
-				log_warn("Bad GNSS: Waiting 3 bad cycles before entering holdover (%d/3)", state->gnss_ko_count);
+				log_warn("Bad GNSS and/or Lock has been lost and/or Phasemeter inconsistency: Waiting 3 bad cycles before entering holdover (%d/3)", state->disciplining_ko_count);
 			}
 
 			set_output(output, ADJUST_FINE, (uint32_t) round(fine_applied_in_holdover), 0);
