@@ -74,8 +74,10 @@ struct algorithm_input {
 	float phase_error;
 	/* Flag indicating GNSS data are valid */
 	bool valid;
-	/** Flag indicating mRO50 is locked */
+	/* Flag indicating mRO50 is locked */
 	bool lock;
+	/* Enum indicating Phasemeter state*/
+	enum art_phasemeter_status phasemeter_status;
 };
 
 /**
@@ -119,7 +121,7 @@ struct algorithm_state {
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
 	float previous_freq_error;
-	int gnss_ko_count;
+	int disciplining_ko_count;
 	/* Timestamp at which we entered holdover */
 	time_t timestamp_entering_holdover;
 	/** MRO50's smoothed temperature over disciplining */
