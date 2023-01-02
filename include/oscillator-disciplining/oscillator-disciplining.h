@@ -235,6 +235,18 @@ struct __attribute__((__packed__)) disciplining_parameters_V_1 {
 };
 
 /**
+ * @enum art_phasemeter_status
+ * @brief Enumeration of the possible phasemeter status
+ */
+enum art_phasemeter_status {
+	PHASEMETER_INIT,
+	PHASEMETER_NO_GNSS_TIMESTAMPS,
+	PHASEMETER_NO_ART_INTERNAL_TIMESTAMPS,
+	PHASEMETER_BOTH_TIMESTAMPS,
+	PHASEMETER_ERROR
+};
+
+/**
  * @struct od_input
  * @brief Structure containing all the input parameters for the disciplining
  * algorithm.
@@ -256,6 +268,8 @@ struct od_input {
 	bool lock;
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
+	/** current phasemeter status */
+	enum art_phasemeter_status phasemeter_status;
 	/** Survey in successfully completed */
 	bool survey_completed;
 };
