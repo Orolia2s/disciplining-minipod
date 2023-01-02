@@ -235,10 +235,10 @@ struct __attribute__((__packed__)) disciplining_parameters_V_1 {
 };
 
 /**
- * @enum art_phasemeter_status
+ * @enum PHASEMETER_STATUS
  * @brief Enumeration of the possible phasemeter status
  */
-enum art_phasemeter_status {
+enum PHASEMETER_STATUS {
 	PHASEMETER_INIT,
 	PHASEMETER_NO_GNSS_TIMESTAMPS,
 	PHASEMETER_NO_ART_INTERNAL_TIMESTAMPS,
@@ -269,7 +269,7 @@ struct od_input {
 	/** is GNSS available (and hence, is the phase error meaningful) */
 	bool valid;
 	/** current phasemeter status */
-	enum art_phasemeter_status phasemeter_status;
+	enum PHASEMETER_STATUS phasemeter_status;
 	/** Survey in successfully completed */
 	bool survey_completed;
 };

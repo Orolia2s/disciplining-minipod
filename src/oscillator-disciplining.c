@@ -673,7 +673,7 @@ int od_process(struct od *od, const struct od_input *input,
 
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, WINDOW_TRACKING);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, WINDOW_TRACKING);
-		enum art_phasemeter_status phasemeter_status = check_phasemeter_status_over_cycle(state->inputs, WINDOW_TRACKING);
+		enum PHASEMETER_STATUS phasemeter_status = check_phasemeter_status_over_cycle(state->inputs, WINDOW_TRACKING);
 
 		float smoothing_coefficient = get_smooth_coefficient(state);
 		update_temperature(state, input->temperature, smoothing_coefficient);
