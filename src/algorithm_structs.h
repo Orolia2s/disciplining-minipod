@@ -77,7 +77,7 @@ struct algorithm_input {
 	/* Flag indicating mRO50 is locked */
 	bool lock;
 	/* Enum indicating Phasemeter state*/
-	enum art_phasemeter_status phasemeter_status;
+	enum PHASEMETER_STATUS phasemeter_status;
 };
 
 /**

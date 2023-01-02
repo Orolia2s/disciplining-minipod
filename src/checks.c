@@ -122,9 +122,9 @@ bool check_lock_over_cycle(struct algorithm_input *inputs, int length)
  * @param length array length
  * @return phasemeter status over cycle is the last phasemeter status encountered in the windows
  */
-enum art_phasemeter_status check_phasemeter_status_over_cycle(struct algorithm_input *inputs, int length)
+enum PHASEMETER_STATUS check_phasemeter_status_over_cycle(struct algorithm_input *inputs, int length)
 {
-	enum art_phasemeter_status phasemeter_status = PHASEMETER_ERROR;
+	enum PHASEMETER_STATUS phasemeter_status = PHASEMETER_ERROR;
 
 	if (inputs == NULL)
 		return false;
