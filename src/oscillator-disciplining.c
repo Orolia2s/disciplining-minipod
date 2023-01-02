@@ -659,12 +659,12 @@ int od_process(struct od *od, const struct od_input *input,
 
 	log_debug("Smoothed temperature is now %.2f", state->mRO_EP_temperature);
 
-	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s and mRO lock: %s",
+	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s, mRO lock: %s and phasemeter status: %d",
 		status_string[od->state.status],
 		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		WINDOW_TRACKING,
-		input->valid ? "True" : "False", input->lock ? "True" : "False"
+		input->valid ? "True" : "False", input->lock ? "True" : "False", input->phasemeter_status
 	);
 
 	/* Check if we reached the number of inputs required to process state's step */
