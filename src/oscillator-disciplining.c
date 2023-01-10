@@ -73,6 +73,7 @@
  *
  */
 uint16_t state_windows[NUM_STATES] = {
+	WINDOW_TRACKING, /* WARMUP */
 	WINDOW_TRACKING, /* INIT */
 	WINDOW_TRACKING, /* TRACKING */
 	WINDOW_TRACKING, /* HOLDOVER */
@@ -84,6 +85,7 @@ uint16_t state_windows[NUM_STATES] = {
  *
  */
 const char *status_string[NUM_STATES] = {
+	"WARMUP",
 	"INIT",
 	"TRACKING",
 	"HOLDOVER",
@@ -95,7 +97,7 @@ const char *status_string[NUM_STATES] = {
  *
  */
 const enum ClockClass state_clock_class[NUM_STATES] = {
-	CLOCK_CLASS_UNCALIBRATED, /* INIT */
+	CLOCK_CLASS_UNCALIBRATED, /* WARMUP or INIT */
 	CLOCK_CLASS_CALIBRATING, /* TRACKING */
 	CLOCK_CLASS_HOLDOVER, /* HOLDOVER */
 	CLOCK_CLASS_CALIBRATING, /* CALIBRATION */
