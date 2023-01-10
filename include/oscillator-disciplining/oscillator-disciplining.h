@@ -313,6 +313,8 @@ struct od_output {
  * @brief Algorithm state value
  */
 enum Disciplining_State {
+	/** Oscillator warm up State */
+	WARMUP,
 	/** Initialization State */
 	INIT,
 	/** Quick convergence phase, tracking phase error to reach 0 */
