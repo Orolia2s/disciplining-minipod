@@ -25,6 +25,7 @@
  * @see oscillator-disciplining.h for API documentation.
  * @see algorithm_structs.h for algorithm's structures definitions.
  */
+
 /**
  * @file oscillator-disciplining.h
  * @brief liboscillator-disciplining's API header file.
@@ -37,6 +38,7 @@
 
 #ifndef INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_
 #define INCLUDE_OSCILLATOR_DISCIPLINING_OSCILLATOR_DISCIPLINING_H_
+
 #include <time.h>
 #include <stdbool.h>
 #include <inttypes.h>
@@ -308,11 +310,8 @@ struct od_output {
 	int32_t value_phase_ctrl;
 };
 
-/**
- * @enum State
- * @brief Algorithm state value
- */
-enum Disciplining_State {
+/** Algorithm state value. */
+enum disciplining_state {
 	/** Oscillator warm up State */
 	WARMUP,
 	/** Initialization State */
@@ -323,10 +322,10 @@ enum Disciplining_State {
 	HOLDOVER,
 	/** Calibration state, when drift coefficients are computed */
 	CALIBRATION,
-	NUM_STATES
+	disciplining_state_count
 };
 
-extern const char *status_string[NUM_STATES];
+const char *cstring_from_disciplining_state(enum disciplining_state state);
 
 /**
  * @struct od
@@ -343,7 +342,7 @@ struct calibration_parameters {
 	uint16_t *ctrl_points;
 	/** Number of control points */
 	int length;
-	/** For each control points, nb_calibration measures 
+	/** For each control points, nb_calibration measures
 	 * of the phase error must be done
 	 */
 	int nb_calibration;
@@ -425,17 +424,20 @@ void od_calibrate(struct od *od, struct calibration_parameters *calib_params, st
  */
 void od_destroy(struct od **od);
 
-enum ClockClass {
+enum clock_class {
 	CLOCK_CLASS_UNCALIBRATED,
 	CLOCK_CLASS_CALIBRATING,
 	CLOCK_CLASS_HOLDOVER,
 	CLOCK_CLASS_LOCK,
-	CLOCK_CLASS_NUM
+	clock_class_count
 };
 
+const char      *cstring_from_clock_class(enum clock_class);
+enum clock_class clock_class_from_disciplining_state(enum disciplining_state);
+
 struct od_monitoring {
-	enum Disciplining_State status;
-	enum ClockClass clock_class;
+	enum disciplining_state status;
+	enum clock_class clock_class;
 	int current_phase_convergence_count;
 	int valid_phase_convergence_threshold;
 	float convergence_progress;

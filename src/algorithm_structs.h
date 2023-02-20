@@ -87,7 +87,7 @@ struct algorithm_input {
 struct algorithm_state {
 	struct algorithm_input *inputs;
 	/** State value */
-	enum Disciplining_State status;
+	enum disciplining_state status;
 	/** Frequency adjustement for one value on the fine control */
 	double mRO_fine_step_sensitivity;
 	/** Frequency adjustement for one value on the coarse control */
