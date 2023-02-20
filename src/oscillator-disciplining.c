@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <oscillator-disciplining/oscillator-disciplining.h>
+#include "oscillator-disciplining/oscillator-disciplining.h"
 
 #include "algorithm_structs.h"
 #include "checks.h"
@@ -70,9 +70,8 @@
 
 /**
  * @brief Window size used for each step
- *
  */
-uint16_t state_windows[NUM_STATES] = {
+uint16_t state_windows[disciplining_state_count] = {
 	WINDOW_TRACKING, /* WARMUP */
 	WINDOW_TRACKING, /* INIT */
 	WINDOW_TRACKING, /* TRACKING */
@@ -80,28 +79,59 @@ uint16_t state_windows[NUM_STATES] = {
 	WINDOW_TRACKING, /* CALIBRATION */
 };
 
-/**
- * @brief Strings displayed for each status
- *
- */
-const char *status_string[NUM_STATES] = {
+/** Strings displayed for each status */
+const char *disciplining_state_strings[disciplining_state_count] = {
 	"WARMUP",
 	"INIT",
 	"TRACKING",
 	"HOLDOVER",
-	"CALIBRATION",
+	"CALIBRATION"
 };
 
-/**
- * @brief Default Clock class for each state
- *
- */
-const enum ClockClass state_clock_class[NUM_STATES] = {
-	CLOCK_CLASS_UNCALIBRATED, /* WARMUP or INIT */
-	CLOCK_CLASS_CALIBRATING, /* TRACKING */
-	CLOCK_CLASS_HOLDOVER, /* HOLDOVER */
-	CLOCK_CLASS_CALIBRATING, /* CALIBRATION */
+const char *cstring_from_disciplining_state(enum disciplining_state state)
+{
+	if (state < 0 || state >= disciplining_state_count)
+	{
+		log_error("Trying to convert to string an invalid disciplining state : %" PRIi64, (long)state);
+		return "INVALID";
+	}
+	return disciplining_state_strings[state];
+}
+
+enum clock_class clock_class_from_disciplining_state(enum disciplining_state state)
+{
+	switch (state)
+	{
+	case WARMUP:
+	case INIT:
+		return CLOCK_CLASS_UNCALIBRATED;
+	case TRACKING:
+	case CALIBRATION:
+		return CLOCK_CLASS_CALIBRATING;
+	case HOLDOVER:
+		return CLOCK_CLASS_HOLDOVER;
+	default:
+		log_error("Trying to convert an invalid disciplining state to a clock class: %" PRIi64, (long)state);
+		return CLOCK_CLASS_UNCALIBRATED;
+	}
+}
+
+const char *clock_class_strings[clock_class_count] = {
+	"Uncalibrated",
+	"Calibrating",
+	"Holdover",
+	"Lock"
 };
+
+const char *cstring_from_clock_class(enum clock_class class)
+{
+	if (class < 0 || class >= clock_class_count)
+	{
+		log_error("Trying to convert an invlaid clock class to string: %" PRIi64, (long)class);
+		return "INVALID";
+	}
+	return clock_class_strings[class];
+}
 
 /**
  * @struct od
@@ -121,7 +151,7 @@ struct od {
  * @param state pointer to algorithm_state structure that will be updated
  * @param new_state New state value
  */
-static void set_state(struct algorithm_state *state, enum Disciplining_State new_state)
+static void set_state(struct algorithm_state *state, enum disciplining_state new_state)
 {
 	state->status = new_state;
 	state->od_inputs_count = 0;
@@ -303,9 +333,9 @@ static void print_inputs(struct algorithm_input *inputs, int length)
 
 /**
  * @brief Initialize temperature table with value from disciplining_parameters
- * 
- * @param state 
- * @param config 
+ *
+ * @param state
+ * @param config
  */
 static void init_temperature_table(struct algorithm_state *state, struct minipod_config *config, struct temperature_table *temp_table)
 {
@@ -662,7 +692,7 @@ int od_process(struct od *od, const struct od_input *input,
 	log_debug("Smoothed temperature is now %.2f", state->mRO_EP_temperature);
 
 	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s, mRO lock: %s and phasemeter status: %d",
-		status_string[od->state.status],
+		cstring_from_disciplining_state(od->state.status),
 		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		WINDOW_TRACKING,
@@ -877,7 +907,7 @@ int od_process(struct od *od, const struct od_input *input,
 						int delta_fine  = round(react_coeff/(MRO_FINE_STEP_SENSITIVITY * 1.E9));
 						state->fine_ctrl_value  = (uint16_t) (state->estimated_equilibrium_ES + delta_fine);
 					}
-					
+
 					log_debug("New fine control value: %u", state->fine_ctrl_value);
 
 
@@ -1036,7 +1066,7 @@ int od_process(struct od *od, const struct od_input *input,
 						float fine_holdover = get_fine_from_table(state, state->holdover_mRO_EP_temperature) > 0.0 ?
 							get_fine_from_table(state, state->holdover_mRO_EP_temperature) :
 							state->estimated_equilibrium_ES;
-						
+
 						float fine_composite = 0.0;
 						if (fine_temp_up < 0.0 || fine_temp_down < 0.0) {
 							/*
@@ -1292,7 +1322,7 @@ int od_get_monitoring_data(struct od *od, struct od_monitoring *monitoring) {
 	if (od == NULL || monitoring == NULL)
 		return -1;
 
-	monitoring->clock_class = state_clock_class[od->state.status];
+	monitoring->clock_class = clock_class_from_disciplining_state(od->state.status);
 	monitoring->status = od->state.status;
 	monitoring->ready_for_holdover = od->state.ready_to_go_in_holdover_class;
 	if (od->state.current_phase_convergence_count >  round(1.0 / ALPHA_ES_TRACKING)) {
