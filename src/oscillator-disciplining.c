@@ -861,6 +861,31 @@ int od_process(struct od *od, const struct od_input *input,
 						log_warn("Estimated equilibrium will not be updated at this step, not updating convergence count as well");
 						if (fabs(mean_phase_error) >= config->ref_fluctuations_ns)
 							log_warn("Mean phase error is too high: %f >= %d", fabs(mean_phase_error), config->ref_fluctuations_ns);
+							// if timefromstart > 300s
+							log_warn("Attempting coarse step");
+							uint32_t new_coarse = input->coarse_setpoint;
+							if ((uint32_t) state->fine_ctrl_value < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint + 1;
+							else if ((uint32_t) state->fine_ctrl_value > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
+								new_coarse = input->coarse_setpoint - 1;
+							log_info("Adjusting coarse value to %u", new_coarse);
+							set_output(output, ADJUST_COARSE, new_coarse, 0);
+
+							/* Reset Tracking state */
+							set_state(state, TRACKING);
+
+							/* Update estimated equilibrium ES to initial guess */
+							if (dsc_config->estimated_equilibrium_ES != 0)
+								state->estimated_equilibrium_ES = (float) dsc_config->estimated_equilibrium_ES;
+							else
+								state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+
+							if (config->oscillator_factory_settings)
+								dsc_config->coarse_equilibrium_factory = new_coarse;
+							else
+								dsc_config->coarse_equilibrium = new_coarse;
+							return 0;
+
 						if (state->fine_ctrl_value < state->ctrl_range_fine[0]
 							|| state->fine_ctrl_value > state->ctrl_range_fine[1])
 							log_warn("Last fine ctrl value is out of middle range: %u", state->fine_ctrl_value);
