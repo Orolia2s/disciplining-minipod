@@ -120,6 +120,8 @@ struct algorithm_state {
 	float estimated_drift;
 	/** Counter of number of cycles where phase error is below reference during tracking phase */
 	uint16_t current_phase_convergence_count;
+	/** Counter for tracking cycles */
+	uint16_t tracking_count_test;
 	float previous_freq_error;
 	int disciplining_ko_count;
 	/* Timestamp at which we entered holdover */

@@ -423,6 +423,8 @@ static int init_algorithm_state(struct od * od) {
 
 	state->ready_to_go_in_holdover_class = false;
 
+	state-> tracking_count_test = 0;
+
 	/* Allocate memory for algorithm inputs */
 	state->inputs = (struct algorithm_input*) malloc(WINDOW_TRACKING * sizeof(struct algorithm_input));
 	if (!state->inputs) {
@@ -812,6 +814,8 @@ int od_process(struct od *od, const struct od_input *input,
 			 * Goal of this state is to reach minimum phase error possible
 			 */
 			case TRACKING:
+				state-> tracking_count_test++;
+				log_info("tracking count %u", state-> tracking_count_test);
 				print_inputs(state->inputs, WINDOW_TRACKING);
 				/* Compute mean phase error over cycle */
 				ret = compute_phase_error_mean(state->inputs, WINDOW_TRACKING, &mean_phase_error);
@@ -859,33 +863,36 @@ int od_process(struct od *od, const struct od_input *input,
 					} else {
 						/* We cannot compute a new estimated equilibrium, logging why */
 						log_warn("Estimated equilibrium will not be updated at this step, not updating convergence count as well");
-						if (fabs(mean_phase_error) >= config->ref_fluctuations_ns)
+						if (fabs(mean_phase_error) >= config->ref_fluctuations_ns){
 							log_warn("Mean phase error is too high: %f >= %d", fabs(mean_phase_error), config->ref_fluctuations_ns);
-							// if timefromstart > 300s
-							log_warn("Attempting coarse step");
-							uint32_t new_coarse = input->coarse_setpoint;
-							if ((uint32_t) state->fine_ctrl_value < (uint32_t) FINE_MID_RANGE_MIN + config->fine_stop_tolerance)
-								new_coarse = input->coarse_setpoint + 1;
-							else if ((uint32_t) state->fine_ctrl_value > (uint32_t) FINE_MID_RANGE_MAX - config->fine_stop_tolerance)
-								new_coarse = input->coarse_setpoint - 1;
-							log_info("Adjusting coarse value to %u", new_coarse);
-							set_output(output, ADJUST_COARSE, new_coarse, 0);
+							// After 30 tracking cycles convergence should be reached, attempting coarse step to center fine control as 400 fine step is 1 coarse step
+							if (state-> tracking_count_test > 30){
+								log_warn("Attempting coarse step");
+								uint32_t new_coarse = input->coarse_setpoint;
+								if ((uint32_t) state->fine_ctrl_value < 2000)
+									new_coarse = input->coarse_setpoint + 1;
+								else if ((uint32_t) state->fine_ctrl_value > 2800)
+									new_coarse = input->coarse_setpoint - 1;
+								log_info("Adjusting coarse value to %u", new_coarse);
+								set_output(output, ADJUST_COARSE, new_coarse, 0);
 
-							/* Reset Tracking state */
-							set_state(state, TRACKING);
+								/* Reset Tracking state */
+								set_state(state, TRACKING);
+								state-> tracking_count_test = 0;
 
-							/* Update estimated equilibrium ES to initial guess */
-							if (dsc_config->estimated_equilibrium_ES != 0)
-								state->estimated_equilibrium_ES = (float) dsc_config->estimated_equilibrium_ES;
-							else
-								state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
+								/* Update estimated equilibrium ES to initial guess */
+								if (dsc_config->estimated_equilibrium_ES != 0)
+									state->estimated_equilibrium_ES = (float) dsc_config->estimated_equilibrium_ES;
+								else
+									state->estimated_equilibrium_ES = (float) state->estimated_equilibrium;
 
-							if (config->oscillator_factory_settings)
-								dsc_config->coarse_equilibrium_factory = new_coarse;
-							else
-								dsc_config->coarse_equilibrium = new_coarse;
-							return 0;
-
+								if (config->oscillator_factory_settings)
+									dsc_config->coarse_equilibrium_factory = new_coarse;
+								else
+									dsc_config->coarse_equilibrium = new_coarse;
+								return 0;
+							}
+						}
 						if (state->fine_ctrl_value < state->ctrl_range_fine[0]
 							|| state->fine_ctrl_value > state->ctrl_range_fine[1])
 							log_warn("Last fine ctrl value is out of middle range: %u", state->fine_ctrl_value);
