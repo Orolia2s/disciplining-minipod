@@ -39,17 +39,13 @@ If not, this means that either the external conditions of the calibration were n
 ### Build
 
 ```bash
-mkdir build && cd build
-cmake ..
-make
+conan build .
 ```
 
 ### Install locally
 
 ``` bash
-cd build
-sudo make install
-
+conan create .
 ```
 
 ## Tests
@@ -63,19 +59,15 @@ Some tests have been implemented in the test directory:
 
 ### Build tests
 
-Test utils:
-
 ``` bash
-cd test
-make test-utils
-./test-utils
+conan install test
+make -C test all
 ```
 
-Test minipod:
+### Run tests
 
 ``` bash
-make test-minipod
-./test-minipod
+make -C test run
 ```
 
 ## Parameters
