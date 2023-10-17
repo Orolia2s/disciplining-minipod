@@ -1,7 +1,7 @@
-build/
+*.a
+*.d
 *.o
-test-minipod-lib
-test-utils
-test-checks
-test-fine-circular-buffer
+*.so
+*conan*.sh
+conanbuild.conf
 output_buffer.txt
