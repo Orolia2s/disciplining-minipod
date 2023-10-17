@@ -1,10 +1,10 @@
 #include <assert.h>
-#include "stdio.h"
+#include <stdio.h>
 
-#include "../src/compare_floats.h"
-#include "../src/log.h"
-#include "../src/fine_circular_buffer.h"
-#include "../src/algorithm_structs.h"
+#include "compare_floats.h"
+#include "log.h"
+#include "fine_circular_buffer.h"
+#include "algorithm_structs.h"
 
 static void test_get_index_of_temperature(void)
 {

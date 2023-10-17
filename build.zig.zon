@@ -1,0 +1,13 @@
+.{
+    .name = .disciplining_minipod,
+    .version = "3.8.3",
+    .fingerprint = 0xdd67c3cb78a001b0,
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+        "test",
+    },
+}

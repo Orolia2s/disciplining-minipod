@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "../src/checks.h"
-#include "../src/algorithm_structs.h"
+#include "checks.h"
+#include "algorithm_structs.h"
 
 int main(int argc, char *argv[]) {
     printf("TEST checks program\n");

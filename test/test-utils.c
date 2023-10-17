@@ -22,8 +22,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "../src/utils.h"
-#include "../src/compare_floats.h"
+#include "utils.h"
+#include "compare_floats.h"
 
 int main(int argc, char *argv[]) {
     int ret;

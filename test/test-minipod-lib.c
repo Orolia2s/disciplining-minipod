@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "../src/compare_floats.h"
+#include "compare_floats.h"
 
 struct minipod_config minipod_config = {
     .ref_fluctuations_ns = 30,

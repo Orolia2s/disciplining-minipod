@@ -47,6 +47,9 @@
 #include "phase.h"
 #include "utils.h"
 
+#define PREPRO_STRINGIZE_NOEVAL(TEXT) #TEXT
+#define PREPRO_STRINGIZE(EXPRESSION) PREPRO_STRINGIZE_NOEVAL(EXPRESSION)
+
 /**
  * @def SETTLING_TIME_MRO50
  * @brief Time oscillator needs to apply new control values
@@ -396,7 +399,7 @@ static int init_algorithm_state(struct od * od) {
 	struct temperature_table *temp_table = &od->dsc_parameters.temp_table;
 	struct minipod_config *config = &od->minipod_config;
 
-	log_info("Init algorithm state with Disciplining-Minipod v%s", PACKAGE_VERSION);
+	log_info("Init algorithm state with Disciplining-Minipod %s", PREPRO_STRINGIZE(PACKAGE_VERSION));
 	/* Constant state values */
 	state->mRO_fine_step_sensitivity = MRO_FINE_STEP_SENSITIVITY;
 	state->mRO_coarse_step_sensitivity = MRO_COARSE_STEP_SENSITIVITY;
