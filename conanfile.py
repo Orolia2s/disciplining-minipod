@@ -73,3 +73,4 @@ class DiscipliningMinipodConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ['oscillator-disciplining']
+        self.cpp_info.system_libs = ['m']

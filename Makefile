@@ -10,8 +10,8 @@
 ##
 
 Name    := oscillator-disciplining
-Static  := $(Name).a
-Shared  := $(Name).so
+Static  := lib$(Name).a
+Shared  := lib$(Name).so
 Version ?= $(shell git tag --sort '-version:refname' --merged | head -1)
 
 ClangFormat ?= clang-format

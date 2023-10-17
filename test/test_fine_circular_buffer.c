@@ -1,5 +1,5 @@
 #include <assert.h>
-#include "stdio.h"
+#include <stdio.h>
 
 #include "../src/compare_floats.h"
 #include "../src/log.h"

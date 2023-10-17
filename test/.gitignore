@@ -1,0 +1,5 @@
+*.pc
+test-checks
+test-minipod-lib
+test-utils
+test_fine_circular_buffer
