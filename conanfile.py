@@ -22,7 +22,7 @@ class DiscipliningMinipodConan(ConanFile):
         'fPIC': True
     }
 
-    exports_sources = 'Makefile', 'src/*.[ch]', 'include/*.h', 'README.md'
+    exports_sources = 'Makefile', 'src/*.[ch]', 'include/*.h', 'README.md', 'LICENSE'
 
     def _get_latest_tag(self):
         git = Git(self, folder=self.recipe_folder)
@@ -62,14 +62,11 @@ class DiscipliningMinipodConan(ConanFile):
         copy(self, '*.h',
              os.path.join(self.source_folder, 'include'),
              os.path.join(self.package_folder, 'include'))
-        copy(self, '*.a', self.build_folder,
-             os.path.join(self.package_folder, 'lib'))
-        copy(self, '*.so', self.build_folder,
-             os.path.join(self.package_folder, 'lib'))
-        copy(self, 'version.txt', self.source_folder,
-             os.path.join(self.package_folder, 'lib'))
-        copy(self, 'README.md', self.source_folder,
-             os.path.join(self.package_folder, 'lib'))
+        for file in ('*.a', '*.so'):
+            copy(self, file, self.build_folder,
+                 os.path.join(self.package_folder, 'lib'))
+        for file in ('version.txt', 'README.md', 'LICENSE'):
+            copy(self, file, self.source_folder, self.package_folder)
 
     def package_info(self):
         self.cpp_info.libs = ['oscillator-disciplining']
