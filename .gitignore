@@ -4,4 +4,5 @@
 *.so
 *conan*.sh
 conanbuild.conf
+/result*
 output_buffer.txt
