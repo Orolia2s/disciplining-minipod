@@ -4,6 +4,8 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const target = b.standardTargetOptions(.{});
 
+    const logc = b.dependency("logc", .{});
+
     const lib = b.addStaticLibrary(.{
         .name = "disciplining_minipod",
         .target = target,
@@ -14,13 +16,13 @@ pub fn build(b: *std.Build) void {
         .files = &.{
             "checks.c",
             "fine_circular_buffer.c",
-            "log.c",
             "oscillator-disciplining.c",
             "phase.c",
             "utils.c",
         },
         .flags = &CFLAGS,
     });
+    lib.addIncludePath(logc.path("src"));
     lib.addIncludePath(b.path("include"));
     lib.installHeadersDirectory(b.path("include"), "", .{});
     lib.linkLibC();

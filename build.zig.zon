@@ -2,7 +2,12 @@
     .name = .disciplining_minipod,
     .version = "3.8.3",
     .fingerprint = 0xdd67c3cb78a001b0,
-    .dependencies = .{},
+    .dependencies = .{
+        .logc = .{
+            .url = "git+https://github.com/rxi/log.c?ref=master#f9ea34994bd58ed342d2245cd4110bb5c6790153",
+            .hash = "N-V-__8AAJ8jAAAVkKD-RFvNLcnmi3SJZWigTFePQTb0sG-u",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
