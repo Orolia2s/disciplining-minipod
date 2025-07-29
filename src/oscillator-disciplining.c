@@ -275,8 +275,8 @@ static int compute_fine_value(struct algorithm_state *state, float react_coeff, 
 		return -1;
 	}
 	/* If linear interpretation returns a negative value, consider value found is 0 before conversion to integers */
-	if (interpolation_value <= 0.0) {
-		log_warn("fine control value found is negative (%f), setting to 0.0", interpolation_value);
+	if (isnan(interpolation_value) || interpolation_value <= 0.0 || interpolation_value > UINT16_MAX) {
+		log_warn("fine control value found is invalid (%f), setting to 0.0", interpolation_value);
 		interpolation_value = 0.0;
 	}
 
@@ -631,8 +631,10 @@ static void add_input_to_algorithm(struct algorithm_input *algorithm_input, cons
 	algorithm_input->phasemeter_status = input->phasemeter_status;
 }
 
-struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *dsc_params, char err_msg[OD_ERR_MSG_LEN])
+struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *dsc_params, char* _ignored)
 {
+	(void)_ignored;
+
 	struct od *od;
 	int ret;
 

@@ -6,10 +6,9 @@ pub fn build(b: *std.Build) void {
 
     const logc = b.dependency("logc", .{});
 
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "disciplining_minipod",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{ .target = target, .optimize = optimize }),
     });
     lib.addCSourceFiles(.{
         .root = b.path("src"),
@@ -38,4 +37,5 @@ const CFLAGS = .{
     "-Wold-style-definition",
     "-Wstrict-prototypes",
     "-Wpointer-arith",
+    "-Werror",
 };
