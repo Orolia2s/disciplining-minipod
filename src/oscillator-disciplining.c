@@ -1107,7 +1107,7 @@ int od_process(struct od *od, const struct od_input *input,
 						float fine_composite = 0.0;
 						if (fine_temp_up < 0.0 || fine_temp_down < 0.0) {
 							/*
-							 * At least one of the fine for tempetarure is not filled in temperature table
+							 * At least one of the fine for temperature is not filled in temperature table
 							 * No compensation is applied
 							 */
 							set_output(output, NO_OP, 0, 0);
