@@ -628,16 +628,14 @@ static void add_input_to_algorithm(struct algorithm_input *algorithm_input, cons
 	algorithm_input->phase_error = input->phase_error.tv_nsec + (float) input->qErr / PS_IN_NS;
 	algorithm_input->valid = input->valid;
 	algorithm_input->lock = input->lock;
-	algorithm_input->phasemeter_status = input->phasemeter_status;
 }
 
-struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *dsc_params, char* _ignored)
+struct od *od_new_from_config(struct minipod_config *minipod_config, struct disciplining_parameters *dsc_params, char*_)
 {
-	(void)_ignored;
-
 	struct od *od;
 	int ret;
 
+	(void)_;
 	od = calloc(1, sizeof(struct od));
 	if (od == NULL)
 		return NULL;
@@ -698,12 +696,12 @@ int od_process(struct od *od, const struct od_input *input,
 
 	log_debug("Smoothed temperature is now %.2f", state->mRO_EP_temperature);
 
-	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s, mRO lock: %s and phasemeter status: %d",
+	log_debug("OD_PROCESS: State is %s, Conv. Step %u, (%u/%u), GNSS valid: %s, mRO lock: %s",
 		cstring_from_disciplining_state(od->state.status),
 		state->current_phase_convergence_count,
 		state->od_inputs_count,
 		WINDOW_TRACKING,
-		input->valid ? "True" : "False", input->lock ? "True" : "False", input->phasemeter_status
+		input->valid ? "True" : "False", input->lock ? "True" : "False"
 	);
 
 	/* Check if we reached the number of inputs required to process state's step */
@@ -712,13 +710,12 @@ int od_process(struct od *od, const struct od_input *input,
 
 		enum gnss_state gnss_state = check_gnss_valid_over_cycle(state->inputs, WINDOW_TRACKING);
 		bool mro50_lock_state = check_lock_over_cycle(state->inputs, WINDOW_TRACKING);
-		enum PHASEMETER_STATUS phasemeter_status = check_phasemeter_status_over_cycle(state->inputs, WINDOW_TRACKING);
 
 		float smoothing_coefficient = get_smooth_coefficient(state);
 		update_temperature(state, input->temperature, smoothing_coefficient);
 
 		/* Check if GNSS state is valid and mro50 is locked and phasemeter is valid*/
-		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT) && (phasemeter_status == PHASEMETER_BOTH_TIMESTAMPS || phasemeter_status == PHASEMETER_INIT))
+		if (gnss_state == GNSS_OK && (mro50_lock_state || od->state.status  == INIT))
 		{
 			state->disciplining_ko_count = 0;
 			if (od->state.status != CALIBRATION
@@ -1071,7 +1068,7 @@ int od_process(struct od *od, const struct od_input *input,
 				return -1;
 			}
 		/* else if gnss is unstable, apply estimated equilibrium to prevent reaching holdover on an unstable state */
-		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state && (phasemeter_status == PHASEMETER_BOTH_TIMESTAMPS || phasemeter_status == PHASEMETER_INIT)) {
+		} else if (gnss_state == GNSS_UNSTABLE && mro50_lock_state) {
 			log_warn("Unstable GNSS: Applying estimated equilibrium");
 			set_output(output, ADJUST_FINE, (uint32_t) round(state->estimated_equilibrium_ES), 0);
 		/* else go into holdover mode if gnss is bad for 3 cycles */
