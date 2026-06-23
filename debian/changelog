@@ -1,3 +1,9 @@
+disciplining-minipod (3.10.0) unstable; urgency=medium
+
+  * Bump version to 3.10.0
+
+ -- Nicolas Bourdaud <nicolas.bourdaud@fr.nav-timing.safrangroup.com>  Tue, 23 Jun 2026 08:34:15 +0200
+
 disciplining-minipod (3.9.3) unstable; urgency=medium
 
   * Bump version to 3.9.3
